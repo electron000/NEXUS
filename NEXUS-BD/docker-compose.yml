@@ -1,0 +1,85 @@
+version: "3.9"
+
+services:
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       nexus
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Node.js Nerve Center ───────────────────────────────────────────────────
+  nerve-center:
+    build:
+      context: ./services/nerve-center
+
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV:              production
+      PORT:                  3001
+      DB_HOST:               postgres
+      DB_PORT:               5432
+      DB_NAME:               nexus
+      DB_USER:               postgres
+      DB_PASSWORD:           postgres
+      JWT_SECRET:            ${JWT_SECRET:-CHANGE_ME}
+      JWT_EXPIRES_IN:        7d
+      INTELLIGENCE_CORE_URL: http://intelligence-core:8000
+      INTERNAL_API_KEY:      ${INTERNAL_API_KEY:-CHANGE_ME}
+      NAMECHEAP_API_USER:    ${NAMECHEAP_API_USER:-}
+      NAMECHEAP_API_KEY:     ${NAMECHEAP_API_KEY:-}
+      NAMECHEAP_CLIENT_IP:   ${NAMECHEAP_CLIENT_IP:-}
+      GODADDY_API_KEY:       ${GODADDY_API_KEY:-}
+      GODADDY_API_SECRET:    ${GODADDY_API_SECRET:-}
+      FRONTEND_ORIGIN:       ${FRONTEND_ORIGIN:-http://localhost:3000}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─── FastAPI Intelligence Core ──────────────────────────────────────────────
+  intelligence-core:
+    build:
+      context: ./services/intelligence-core
+
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PRODUCTION:          "true"
+      INTERNAL_API_KEY:    ${INTERNAL_API_KEY:-CHANGE_ME}
+      NERVE_CENTER_ORIGIN: http://nerve-center:3001
+      OPENAI_API_KEY:      ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY:      ${GEMINI_API_KEY:-}
+      USE_PYTRENDS:        "true"
+      MODEL_PATH:          /app/models/
+    volumes:
+      - ml_models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:
+  ml_models:

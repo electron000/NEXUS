@@ -1,0 +1,13 @@
+node_modules/
+.env
+*.log
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+models/*.pkl
+dist/
+build/
+.DS_Store
