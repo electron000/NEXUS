@@ -23,43 +23,59 @@ from app.utils.logger import logger
 # ─── XGBoost model management ────────────────────────────────────────────────
 
 _model = None          # XGBRegressor or None
+_rf_model = None       # RandomForestRegressor or None
 _MODEL_FILE = Path(settings.model_path) / "quantitative_baseline.pkl"
+_RF_MODEL_FILE = Path(settings.model_path) / settings.rf_model_filename
 
 
-def _load_or_train_model():
+def _load_or_train_models():
     """
-    Load a persisted XGBoost model from disk, or train a bootstrap model
-    on synthetic data if none exists yet.
+    Load persisted XGBoost and Random Forest models from disk, or train
+    bootstrap models on synthetic data if none exists yet.
     """
-    global _model
+    global _model, _rf_model
 
+    # --- XGBoost ---
     if _MODEL_FILE.exists():
-        logger.info(f"Loading persisted model from {_MODEL_FILE}")
+        logger.info(f"Loading persisted XGBoost model from {_MODEL_FILE}")
         with open(_MODEL_FILE, "rb") as f:
             _model = pickle.load(f)
-        return
+    else:
+        logger.warning("No persisted XGBoost model found – training bootstrap model.")
+        _model = _train_bootstrap_model(model_type="xgboost")
+        _MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_MODEL_FILE, "wb") as f:
+            pickle.dump(_model, f)
 
-    logger.warning("No persisted model found – training bootstrap model on synthetic data.")
-    _model = _train_bootstrap_model()
+    # --- Random Forest ---
+    if _RF_MODEL_FILE.exists():
+        logger.info(f"Loading persisted Random Forest model from {_RF_MODEL_FILE}")
+        with open(_RF_MODEL_FILE, "rb") as f:
+            _rf_model = pickle.load(f)
+    else:
+        logger.warning("No persisted Random Forest model found – training bootstrap model.")
+        _rf_model = _train_bootstrap_model(model_type="rf")
+        _RF_MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_RF_MODEL_FILE, "wb") as f:
+            pickle.dump(_rf_model, f)
 
-    # Persist for next startup
-    _MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(_MODEL_FILE, "wb") as f:
-        pickle.dump(_model, f)
-    logger.info(f"Bootstrap model saved to {_MODEL_FILE}")
 
-
-def _train_bootstrap_model():
+def _train_bootstrap_model(model_type: str = "xgboost"):
     """
-    Train a simple XGBoost regressor on synthetically generated domain data.
-    In production this should be replaced by real labelled sales data
-    (e.g. from Namebio, Sedo, or GoDaddy Auctions).
+    Train a simple model (XGBoost or Random Forest) on synthetically generated domain data.
     """
-    try:
-        import xgboost as xgb
-    except ImportError:
-        logger.warning("XGBoost not installed – falling back to linear heuristic")
-        return None
+    if model_type == "xgboost":
+        try:
+            import xgboost as xgb
+        except ImportError:
+            logger.warning("XGBoost not installed – falling back to linear heuristic")
+            return None
+    else:
+        try:
+            from sklearn.ensemble import RandomForestRegressor
+        except ImportError:
+            logger.warning("scikit-learn not installed – falling back to linear heuristic")
+            return None
 
     rng = np.random.default_rng(42)
     N = 5_000
@@ -80,9 +96,9 @@ def _train_bootstrap_model():
         uniqueness, alt_scores, tld_scores, power_keywords, max_repeats,
     ])
 
-    # Synthetic "ground truth" scores with sensible priors
+    # Synthetic "ground truth" scores
     y = (
-        (1 / np.clip(lengths, 3, 25)) * 25          # short = better
+        (1 / np.clip(lengths, 3, 25)) * 25
         + vowel_ratios * 15
         + alt_scores * 15
         + tld_scores * 20
@@ -90,26 +106,36 @@ def _train_bootstrap_model():
         - digit_ratios * 10
         - hyphen_counts * 5
         - (max_repeats - 1) * 3
-        + rng.normal(0, 3, N)                        # noise
+        + rng.normal(0, 3, N)
     )
-    y = np.clip(y * 2.5, 10, 95)                    # scale to ~10–95
+    y = np.clip(y * 2.5, 10, 95)
 
-    model = xgb.XGBRegressor(
-        n_estimators=200,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        tree_method="hist",
-    )
+    if model_type == "xgboost":
+        model = xgb.XGBRegressor(
+            n_estimators=200,
+            max_depth=5,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42,
+            tree_method="hist",
+        )
+        logger.info("Bootstrap XGBoost model trained.")
+    else:
+        model = RandomForestRegressor(
+            n_estimators=100,
+            max_depth=7,
+            random_state=42,
+            n_jobs=-1
+        )
+        logger.info("Bootstrap Random Forest model trained.")
+
     model.fit(X, y)
-    logger.info("Bootstrap XGBoost model trained.")
     return model
 
 
-def _predict_quantitative(domain: str) -> float:
-    """Run feature extraction + XGBoost (or fallback heuristic) for a domain."""
+def _predict_quantitative(domain: str, model_type: str = "xgboost") -> float:
+    """Run feature extraction + specified model (or fallback heuristic) for a domain."""
     feats = extract(domain)
     feat_order = [
         "length", "vowel_ratio", "digit_ratio", "hyphen_count",
@@ -117,12 +143,14 @@ def _predict_quantitative(domain: str) -> float:
     ]
     X = np.array([[feats[k] for k in feat_order]])
 
-    if _model is not None:
+    target_model = _model if model_type == "xgboost" else _rf_model
+
+    if target_model is not None:
         try:
-            score = float(_model.predict(X)[0])
+            score = float(target_model.predict(X)[0])
             return round(max(0.0, min(100.0, score)), 2)
         except Exception as exc:
-            logger.warning(f"XGBoost predict failed: {exc}")
+            logger.warning(f"{model_type.upper()} predict failed: {exc}")
 
     # Linear heuristic fallback
     score = (
@@ -140,30 +168,25 @@ def _predict_quantitative(domain: str) -> float:
 async def warm_up():
     """Called at application startup to avoid cold-start latency."""
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _load_or_train_model)
+    await loop.run_in_executor(None, _load_or_train_models)
     # Prime the semantic cache with a dummy call (no-op if no LLM key)
     await get_semantic_score("example.com")
 
 
 async def score_domain(domain: str) -> dict:
     """
-    Compute all three Nexus score components concurrently.
-
-    Returns:
-        {
-          "quantitativeBaseline": float,
-          "semanticScore":        float,
-          "trendMomentum":        float,
-        }
+    Compute all Nexus score components concurrently, including both XGBoost and RF baselines.
     """
     loop = asyncio.get_event_loop()
 
-    quantitative_task = loop.run_in_executor(None, _predict_quantitative, domain)
-    semantic_task     = get_semantic_score(domain)
-    trend_task        = get_trend_momentum(domain)
+    xgb_task = loop.run_in_executor(None, _predict_quantitative, domain, "xgboost")
+    rf_task  = loop.run_in_executor(None, _predict_quantitative, domain, "rf")
+    semantic_task = get_semantic_score(domain)
+    trend_task    = get_trend_momentum(domain)
 
-    quantitative, semantic, trend = await asyncio.gather(
-        quantitative_task,
+    xgb_score, rf_score, semantic, trend = await asyncio.gather(
+        xgb_task,
+        rf_task,
         semantic_task,
         trend_task,
         return_exceptions=True,
@@ -176,7 +199,9 @@ async def score_domain(domain: str) -> dict:
         return float(val)
 
     return {
-        "quantitativeBaseline": safe(quantitative, 50.0),
-        "semanticScore":        safe(semantic, 50.0),
-        "trendMomentum":        safe(trend, 0.0),
+        "quantitativeBaseline":   safe(xgb_score, 50.0),
+        "rfQuantitativeBaseline": safe(rf_score, 50.0),
+        "ensembleScore":          round((safe(xgb_score, 50.0) + safe(rf_score, 50.0)) / 2, 2),
+        "semanticScore":          safe(semantic, 50.0),
+        "trendMomentum":          safe(trend, 0.0),
     }

@@ -30,6 +30,14 @@ class NexusScoreResponse(BaseModel):
         ..., ge=0, le=100,
         description="LLM-derived semantic quality, memorability, and brandability."
     )
+    rf_quantitative_baseline: float = Field(
+        ..., ge=0, le=100,
+        description="Score based on Random Forest model (alternative to XGBoost)."
+    )
+    ensemble_quantitative_score: float = Field(
+        ..., ge=0, le=100,
+        description="Optimized score combining XGBoost and Random Forest models."
+    )
     trend_momentum: float = Field(
         ..., ge=-100, le=100,
         description="Google Trends momentum (-100 declining → +100 surging)."

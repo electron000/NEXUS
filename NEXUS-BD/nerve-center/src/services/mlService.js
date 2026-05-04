@@ -7,22 +7,54 @@
  * Handles scoring and feature-based valuation.
  */
 
-const logger = require('../config/logger');
+const axios = require('axios');
 const { predictDomainMetrics } = require('./csvService');
 
+const INTELLIGENCE_CORE_URL = process.env.INTELLIGENCE_CORE_URL || 'http://localhost:8000';
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || '';
+
 /**
- * Calculate Nexus Value Score for a domain using CSV data.
+ * Calculate Nexus Value Score for a domain.
+ * Attempts to use Intelligence Core (FastAPI), falls back to local CSV KNN.
  *
  * @param {string} domain
  * @returns {Promise<{ quantitative: number, semantic: number, trend: number, predictedPrice: number, tier: string }>}
  */
 async function getNexusScore(domain) {
   try {
-    const metrics = await predictDomainMetrics(domain);
-    return metrics;
+    logger.info('Calling Intelligence Core for domain score', { domain });
+    
+    const response = await axios.post(`${INTELLIGENCE_CORE_URL}/api/ml/nexus-score`, {
+      domain
+    }, {
+      headers: { 'X-Internal-API-Key': INTERNAL_API_KEY },
+      timeout: parseInt(process.env.ML_TIMEOUT_MS || '30000', 10)
+    });
+
+    const data = response.data;
+    
+    return {
+      quantitative: data.ensemble_quantitative_score, // Use the new ensemble model!
+      semantic: data.semantic_score,
+      trend: data.trend_momentum,
+      predictedPrice: 0, // Intelligence core doesn't return price yet
+      tier: data.ensemble_quantitative_score > 75 ? 'high' : data.ensemble_quantitative_score > 50 ? 'medium' : 'low',
+      model_used: data.model_used
+    };
   } catch (err) {
-    logger.error('ML scoring failed', { domain, message: err.message });
-    return fallbackScore(domain);
+    logger.warn('Intelligence Core failed, falling back to CSV KNN', { 
+      domain, 
+      error: err.message,
+      code: err.code
+    });
+    
+    try {
+      const metrics = await predictDomainMetrics(domain);
+      return metrics;
+    } catch (csvErr) {
+      logger.error('ML scoring fallback failed', { domain, message: csvErr.message });
+      return fallbackScore(domain);
+    }
   }
 }
 
