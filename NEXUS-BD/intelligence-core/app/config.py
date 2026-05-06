@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     # Feature flags
     use_pytrends: bool = True          # disable in CI / sandboxed envs
     model_path: str = "models/"        # directory for persisted XGBoost models
-    rf_model_filename: str = "rf_quantitative_baseline.pkl"
 
 
 settings = Settings()

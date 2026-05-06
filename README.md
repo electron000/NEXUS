@@ -29,7 +29,7 @@ The NEXUS ecosystem is composed of three primary layers, ensuring high performan
 ### 3. **NEXUS-BD: Intelligence Core (ML Service)**
 - **Runtime**: Python / FastAPI
 - **Intelligence**:
-  - **Nexus Ensemble Model**: A high-accuracy dual-model system combining **XGBoost** and **Random Forest** regressors. Tested at **91.18% closeness accuracy** on unseen data.
+  - **XGBoost Quantitative Score**: Derived from a 4,000+ row historical domain dataset.
   - **LLM Semantic Score**: Linguistic analysis via OpenAI/Gemini.
   - **Momentum Tracking**: Real-time Google Trends integration for "Trend Score" synthesis.
 
@@ -69,7 +69,7 @@ NEXUS leverages direct API integrations to provide real-time arbitrage signals.
 ### 1. **The Domain Terminal (Valuation Engine)**
 Search any domain to trigger a multi-stage valuation pipeline:
 1. **Scraping**: Fetches live registrar pricing and availability.
-2. **ML Scoring**: Calculates the "Nexus Ensemble Score" (0–100) using a dual-algorithm approach and assigns an investment grade (S–F).
+2. **ML Scoring**: Calculates the "Nexus Score" (0–100) and assigns an investment grade (S–F).
 3. **TCO Modeling**: Generates a 5-year Total Cost of Ownership projection (Best/Expected/Worst case).
 4. **Arbitrage Signals**: Identifies price discrepancies between registrars for immediate ROI.
 

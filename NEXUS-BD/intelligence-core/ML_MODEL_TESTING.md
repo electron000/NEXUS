@@ -1,6 +1,6 @@
 # NEXUS ML Model Testing & Training Guide 🧪
 
-This document outlines the testing methodology and training workflows for the NEXUS Intelligence Core's **Dual-Model Ensemble** (XGBoost + Random Forest).
+This document outlines the testing methodology and training workflows for the NEXUS Intelligence Core's XGBoost valuation model.
 
 ---
 
@@ -21,19 +21,9 @@ We use a multi-tiered approach to ensure the model remains accurate and generali
     4.  Tests that model on the 20% it has **never seen**.
 *   **Result**: This provides the most realistic "Closeness Accuracy" score (currently **~91%**).
 
-### 3. Model Comparison (`evaluate_models_comparison.py`)
-- **Purpose**: Directly compares the performance of XGBoost vs. Random Forest on the same dataset.
-- **Logic**: Loads both persisted models and reports side-by-side metrics.
-
-### 4. Ensemble Performance (`test_ensemble.py`)
-- **Purpose**: Proves the mathematical benefit of combining models.
-- **Result**: Confirms a ~1% R² improvement when using the average of both models.
-
-### 5. Production Deployment
-- **Scripts**: 
-    - `train_production_model.py` (XGBoost)
-    - `train_production_model_rf.py` (Random Forest)
-- **Logic**: Trains on **100%** of data and overwrites the production `.pkl` files in `models/`.
+### 3. Production Deployment (`train_production_model.py`)
+- **Purpose**: Updates the live application.
+*   **Logic**: Trains on **100%** of the available data and overwrites `models/quantitative_baseline.pkl`.
 
 ---
 
@@ -54,15 +44,12 @@ Ensure you are in the `intelligence-core` directory:
 
 ### To run a realistic accuracy test:
 ```powershell
-python scripts/train_test_eval.py        # XGBoost only
-python scripts/train_test_comparison.py  # Side-by-side split test
-python scripts/test_ensemble.py           # Combined accuracy test
+python scripts/train_test_eval.py
 ```
 
-### To update the live models with new data:
+### To update the live model with new data:
 ```powershell
 python scripts/train_production_model.py
-python scripts/train_production_model_rf.py
 ```
 
 ---

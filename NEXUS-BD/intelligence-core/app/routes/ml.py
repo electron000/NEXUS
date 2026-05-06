@@ -32,9 +32,7 @@ async def nexus_score(req: NexusScoreRequest):
     return NexusScoreResponse(
         domain=req.domain,
         quantitative_baseline=scores["quantitativeBaseline"],
-        rf_quantitative_baseline=scores["rfQuantitativeBaseline"],
-        ensemble_quantitative_score=scores["ensembleScore"],
         semantic_score=scores["semanticScore"],
         trend_momentum=scores["trendMomentum"],
-        model_used="ensemble",
+        model_used="xgboost",
     )
