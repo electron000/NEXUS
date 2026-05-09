@@ -4,7 +4,6 @@ app/config.py – Centralised settings loaded from environment / .env file.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", 
@@ -20,13 +19,15 @@ class Settings(BaseSettings):
     internal_api_key: str = ""
     nerve_center_origin: str = "http://localhost:3001"
 
-    # LLM providers (at least one recommended for semantic scoring)
+    # LLM providers
     openai_api_key: str = ""
     gemini_api_key: str = ""
+    # Explicitly declared so it can be targeted by .env overrides
+    gemini_model_name: str = "gemini-2.5-flash"
 
     # Feature flags
-    use_pytrends: bool = True          # disable in CI / sandboxed envs
-    model_path: str = "models/"        # directory for persisted XGBoost models
+    use_pytrends: bool = True
+    model_path: str = "models/"
 
 
 settings = Settings()

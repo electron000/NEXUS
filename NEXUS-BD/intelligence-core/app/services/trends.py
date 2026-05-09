@@ -64,7 +64,7 @@ def _fetch_sync(keyword: str) -> float:
         # Momentum = slope of linear trend, normalised to [-100, 100]
         import numpy as np
         x = np.arange(len(series))
-        slope, _ = np.polyfit(x, series.values, 1)
+        slope, _ = np.polyfit(x, np.asarray(series.values, dtype=float), 1)
 
         # Typical weekly slope rarely exceeds ±5 points; clamp and scale
         momentum = float(np.clip(slope * 20, -100, 100))

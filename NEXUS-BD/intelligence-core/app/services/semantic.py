@@ -1,12 +1,4 @@
-"""
-app/services/semantic.py
-
-Uses an LLM to score the semantic quality, brandability, and memorability
-of a domain name. Returns a normalised score 0–100.
-
-Priority: OpenAI GPT-4o → Google Gemini → heuristic fallback
-"""
-
+# app/services/semantic.py
 from __future__ import annotations
 import json
 import re
@@ -36,9 +28,9 @@ async def get_semantic_score(domain: str) -> float:
     if domain in _cache:
         return _cache[domain]
 
-    score = await _score_with_openai(domain)
-    if score is None:
-        score = await _score_with_gemini(domain)
+    score = await _score_with_gemini(domain)
+    
+    # Fallback to local heuristic if the LLM API fails or returns invalid data
     if score is None:
         score = _heuristic_fallback(domain)
 
@@ -46,39 +38,59 @@ async def get_semantic_score(domain: str) -> float:
     return score
 
 
-async def _score_with_openai(domain: str) -> float | None:
-    if not settings.openai_api_key:
-        return None
-    try:
-        import openai
-        client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user",   "content": f"Domain: {domain}"},
-            ],
-            temperature=0.2,
-            max_tokens=80,
-        )
-        raw = response.choices[0].message.content or ""
-        return _parse_llm_json(raw)
-    except Exception as exc:
-        logger.warning(f"OpenAI semantic score failed for '{domain}': {exc}")
-        return None
-
-
 async def _score_with_gemini(domain: str) -> float | None:
     if not settings.gemini_api_key:
+        logger.warning("Gemini API key is missing. Skipping LLM scoring.")
         return None
+        
     try:
         import google.generativeai as genai
         genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        # Will now safely fetch the 2.5-flash default or user override
+        target_model_name = getattr(settings, 'gemini_model_name', "gemini-2.5-flash")
         prompt = f"{_SYSTEM_PROMPT}\n\nDomain: {domain}"
-        response = await model.generate_content_async(prompt)
+        
+        # 1. Define a robust fallback chain using current 2026 stable models
+        models_to_try = list(dict.fromkeys([
+            target_model_name,
+            "gemini-2.5-flash",          # Current standard for speed/cost
+            "gemini-2.5-pro",            # High-capability reasoning fallback
+            "gemini-3-flash-preview"     # Bleeding-edge fallback if 2.5 fails
+        ]))
+        
+        response = None
+        last_error = None
+        
+        # 2. Iterate through models, breaking on success
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = await model.generate_content_async(prompt)
+                
+                # Log successful recovery if a fallback was used
+                if model_name != target_model_name:
+                    logger.info(f"Successfully recovered using fallback model: '{model_name}'")
+                break  # Exit loop on success
+                
+            except Exception as api_exc:
+                last_error = api_exc
+                # 3. Check for 404 (Model not found/Retired). If found, try the next model.
+                if "404" in str(api_exc) or "not found" in str(api_exc).lower():
+                    logger.debug(f"Gemini model '{model_name}' returned 404. Trying next fallback...")
+                    continue
+                else:
+                    # Re-raise immediately if it's an Auth, Quota, or Network error
+                    raise api_exc
+                    
+        # If the loop finishes and response is still None, all fallbacks failed
+        if not response:
+            logger.error(f"All attempted Gemini models returned 404. Last error: {last_error}")
+            return None
+
         raw = response.text or ""
         return _parse_llm_json(raw)
+        
     except Exception as exc:
         logger.warning(f"Gemini semantic score failed for '{domain}': {exc}")
         return None

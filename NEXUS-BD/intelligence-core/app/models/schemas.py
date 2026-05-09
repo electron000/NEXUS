@@ -22,9 +22,13 @@ class NexusScoreRequest(BaseModel):
 
 class NexusScoreResponse(BaseModel):
     domain: str
-    quantitative_baseline: float = Field(
+    model_score: float = Field(
         ..., ge=0, le=100,
-        description="Score based on length, TLD premium, character composition."
+        description=(
+            "Tier model output scaled to 0–100. Derived from the user-trained "
+            "RandomForest tier model (raw output 0–1 × 100). Replaces the "
+            "old XGBoost quantitative baseline as the structural Nexus component."
+        )
     )
     semantic_score: float = Field(
         ..., ge=0, le=100,
@@ -34,9 +38,18 @@ class NexusScoreResponse(BaseModel):
         ..., ge=-100, le=100,
         description="Google Trends momentum (-100 declining → +100 surging)."
     )
-    predicted_price: float = Field(default=0.0, description="Predicted aftermarket price from user model.")
-    predicted_tier: str = Field(default="low", description="Predicted investment tier (low | medium | high).")
-    model_used: str = Field(default="xgboost", description="xgboost | heuristic | llm-only")
+    predicted_price: float = Field(
+        default=0.0,
+        description="Predicted aftermarket price from the price model."
+    )
+    predicted_tier: str = Field(
+        default="low",
+        description="Predicted investment tier (low | medium | high)."
+    )
+    model_used: str = Field(
+        default="random_forest",
+        description="random_forest | heuristic | llm-only"
+    )
 
     model_config = {
         "protected_namespaces": ()
