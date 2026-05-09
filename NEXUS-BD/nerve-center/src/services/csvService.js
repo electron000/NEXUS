@@ -5,7 +5,7 @@ const path = require('path');
 const csv = require('csv-parser');
 const logger = require('../config/logger');
 
-const CSV_PATH = path.join(__dirname, '../../../nexus_domain_india_4000.csv');
+const CSV_PATH = path.join(__dirname, '../../../intelligence-core/data/nexus_domain_india_4000.csv');
 
 let domainData = [];
 let isLoaded = false;

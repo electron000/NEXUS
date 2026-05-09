@@ -4,7 +4,36 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { query } = require('../config/db');
+const { verifyDNS, verifyHTML } = require('../services/verificationService');
+const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
 const logger = require('../config/logger');
+
+// Setup multer storage for KYC documents
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/kyc/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `${req.user.id}-${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images are allowed (jpg, jpeg, png)'));
+    }
+  }
+});
 
 const router = express.Router();
 
@@ -15,7 +44,8 @@ router.use(authenticate);
 router.get('/profile', async (req, res) => {
   try {
     const result = await query(
-      `SELECT email, created_at, preferences FROM users WHERE id = $1`,
+      `SELECT email, created_at, preferences, kyc_status, first_name, middle_name, last_name 
+       FROM users WHERE id = $1`,
       [req.user.id],
     );
 
@@ -26,13 +56,16 @@ router.get('/profile', async (req, res) => {
     const row = result.rows[0];
     const preferences = row.preferences || {
       trackingExtensions: ['.com', '.net', '.io'],
-      currency: 'USD',
     };
 
     return res.json({
       email:      row.email,
       createdAt:  row.created_at,
       preferences,
+      kyc_status: row.kyc_status,
+      firstName:  row.first_name,
+      middleName: row.middle_name,
+      lastName:   row.last_name,
     });
   } catch (err) {
     logger.error('GET /profile error', { userId: req.user.id, message: err.message });
@@ -45,7 +78,6 @@ const VALID_EXTENSIONS = [
   '.com', '.net', '.org', '.io', '.co', '.app', '.dev',
   '.ai', '.xyz', '.info', '.biz', '.us', '.uk', '.de',
 ];
-const VALID_CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD', 'JPY'];
 
 router.put(
   '/profile',
@@ -57,9 +89,6 @@ router.put(
     body('preferences.trackingExtensions.*')
       .isIn(VALID_EXTENSIONS)
       .withMessage(`Each extension must be one of: ${VALID_EXTENSIONS.join(', ')}`),
-    body('preferences.currency')
-      .isIn(VALID_CURRENCIES)
-      .withMessage(`currency must be one of: ${VALID_CURRENCIES.join(', ')}`),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -88,53 +117,61 @@ router.get('/dashboard', async (req, res) => {
   try {
     const { predictDomainMetrics } = require('../services/csvService');
     const { calculateRegistrarPricing } = require('../services/pricingService');
+    const { calculateAftermarketValue } = require('../services/pricingService');
 
-    // Generate dynamic sentiment based on CSV averages
-    // In a real app, this would be a time-series aggregation
-    const sentiment = 65 + (Math.random() * 10 - 5);
+    // 1. Get real watchlist size
+    const watchlistResult = await query(
+      'SELECT COUNT(*) as count FROM watchlist WHERE user_id = $1',
+      [req.user.id]
+    );
+    const watchlistCount = parseInt(watchlistResult.rows[0]?.count || 0, 10);
 
-    // Pick 5 top movers from interesting domains
-    const moverDomains = ['nexus.io', 'protocol.ai', 'vertex.com', 'cipher.io', 'matrix.ai'];
-    const topMovers = await Promise.all(moverDomains.map(async (d) => {
-      const score = await predictDomainMetrics(d);
-      const pricing = calculateRegistrarPricing(d, score);
-      const change = (Math.random() * 15) * (Math.random() > 0.3 ? 1 : -1);
-      return {
-        domain: d,
-        change: parseFloat(change.toFixed(2)),
-        value: pricing[0].initial * 10, // Simulated asset value
-      };
+    // 2. Get User Portfolio & Calculate Metrics
+    const portfolioResult = await query(
+      'SELECT domain, verification_status FROM portfolio WHERE user_id = $1',
+      [req.user.id]
+    );
+    const portfolioRows = portfolioResult.rows;
+    const verifiedAssets = portfolioRows.filter(r => r.verification_status === 'verified');
+
+    let totalValue = 0;
+    let totalHoldingCost = 0;
+
+    // Calculate metrics for each portfolio asset
+    await Promise.all(portfolioRows.map(async (row) => {
+      const scores = await predictDomainMetrics(row.domain);
+      
+      const appraisal = calculateAftermarketValue(row.domain, scores);
+      totalValue += appraisal.value;
+
+      const pricing = calculateRegistrarPricing(row.domain, scores);
+      const avgRenewal = pricing.reduce((sum, p) => sum + p.renewal, 0) / pricing.length;
+      totalHoldingCost += (avgRenewal / 12);
     }));
 
     const metrics = {
       portfolioValue: {
-        label: "Portfolio Value",
-        value: 512400.00 + (Math.random() * 5000 - 2500),
-        change: 4.2 + (Math.random() * 0.5 - 0.25),
+        label: "Portfolio Net Worth",
+        value: totalValue || 0,
+        change: 0,
         prefix: "$",
-        sparkline: Array.from({ length: 12 }, () => 500 + Math.random() * 50),
       },
       activeDomains: {
-        label: "Active Domains",
-        value: 154,
-        change: 1.2,
-        sparkline: Array.from({ length: 12 }, () => 140 + Math.random() * 20),
+        label: "Verified Assets",
+        value: verifiedAssets.length,
+        change: 0,
       },
       monthlyRevenue: {
-        label: "Monthly Revenue",
-        value: 15800.00 + (Math.random() * 1000 - 500),
-        change: 5.5 + (Math.random() * 1.0 - 0.5),
+        label: "Monthly Holding Cost",
+        value: totalHoldingCost || 0,
+        change: 0,
         prefix: "$",
-        sparkline: Array.from({ length: 12 }, () => 14000 + Math.random() * 2000),
       },
       watchlistSize: {
         label: "Watchlist",
-        value: 32,
-        change: -0.8,
-        sparkline: Array.from({ length: 12 }, () => 25 + Math.random() * 10),
-      },
-      marketSentiment: parseFloat(sentiment.toFixed(1)),
-      topMovers,
+        value: watchlistCount,
+        change: 0,
+      }
     };
 
     return res.json(metrics);
@@ -144,5 +181,126 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
+
+// ─── GET /api/user/portfolio ──────────────────────────────────────────────────
+router.get('/portfolio', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT * FROM portfolio WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch portfolio.' });
+  }
+});
+
+// ─── POST /api/user/portfolio ─────────────────────────────────────────────────
+router.post(
+  '/portfolio',
+  [
+    body('domain').isString().trim().toLowerCase(),
+    body('isForSale').optional().isBoolean(),
+    body('askingPrice').optional().isNumeric(),
+  ],
+  async (req, res) => {
+    const { domain, isForSale, askingPrice } = req.body;
+    const token = crypto.randomBytes(16).toString('hex');
+
+    try {
+      const result = await query(
+        `INSERT INTO portfolio (user_id, domain, is_for_sale, asking_price, verification_token) 
+         VALUES ($1, $2, $3, $4, $5) 
+         RETURNING *`,
+        [req.user.id, domain, isForSale || false, askingPrice || null, token]
+      );
+      return res.status(201).json(result.rows[0]);
+    } catch (err) {
+      if (err.code === '23505') return res.status(409).json({ error: 'Domain already listed.' });
+      return res.status(500).json({ error: 'Failed to add domain to portfolio.' });
+    }
+  }
+);
+
+// ─── POST /api/user/portfolio/verify ──────────────────────────────────────────
+router.post('/portfolio/verify', async (req, res) => {
+  const { domain, method } = req.body; // method: 'dns' | 'html'
+
+  try {
+    const result = await query(
+      'SELECT * FROM portfolio WHERE user_id = $1 AND domain = $2',
+      [req.user.id, domain]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Domain not found in portfolio.' });
+
+    const p = result.rows[0];
+    let verification;
+
+    // Developer Bypass for .test domains
+    if (domain.endsWith('.test')) {
+      logger.info('Developer Bypass triggered for .test domain', { domain });
+      verification = { success: true };
+    } else if (method === 'dns') {
+      verification = await verifyDNS(domain, p.verification_token);
+    } else {
+      verification = await verifyHTML(domain, p.verification_token);
+    }
+
+    if (verification.success) {
+      await query(
+        "UPDATE portfolio SET verification_status = 'verified', last_verified_at = NOW() WHERE id = $1",
+        [p.id]
+      );
+      return res.json({ success: true, message: 'Domain verified successfully (Nexus Developer Bypass).' });
+    } else {
+      return res.json({ success: false, error: 'Verification failed. Please check your settings and try again.' });
+    }
+  } catch (err) {
+    logger.error('Verification error', { domain, error: err.message });
+    return res.status(500).json({ error: 'Verification process failed.' });
+  }
+});
+
+// ─── POST /api/user/kyc/submit ────────────────────────────────────────────────
+router.post(
+  '/kyc/submit',
+  upload.fields([
+    { name: 'aadhaar_front', maxCount: 1 },
+    { name: 'aadhaar_back',  maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const { 
+        firstName, middleName, lastName, 
+        fatherName, motherName, address 
+      } = req.body;
+
+      const frontPath = req.files['aadhaar_front'] ? `/uploads/kyc/${req.files['aadhaar_front'][0].filename}` : null;
+      const backPath = req.files['aadhaar_back'] ? `/uploads/kyc/${req.files['aadhaar_back'][0].filename}` : null;
+
+      if (!frontPath || !backPath) {
+        return res.status(400).json({ error: 'Both Aadhaar sides are required.' });
+      }
+
+      await query(
+        `UPDATE users 
+         SET kyc_status = 'pending',
+             first_name = $1, middle_name = $2, last_name = $3,
+             father_name = $4, mother_name = $5, address = $6,
+             aadhaar_front_path = $7, aadhaar_back_path = $8,
+             updated_at = NOW()
+         WHERE id = $9`,
+        [firstName, middleName, lastName, fatherName, motherName, address, frontPath, backPath, req.user.id]
+      );
+
+      logger.info('KYC submitted for user', { userId: req.user.id });
+      return res.json({ success: true, message: 'KYC documents submitted for manual review.' });
+    } catch (err) {
+      logger.error('KYC submission error', { userId: req.user.id, message: err.message });
+      return res.status(500).json({ error: 'Failed to submit KYC documents.' });
+    }
+  }
+);
 
 module.exports = router;

@@ -4,6 +4,3 @@
 ALTER TABLE users 
 ADD COLUMN IF NOT EXISTS name TEXT,
 ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'analyst';
-
--- Update the demo user to have a name
-UPDATE users SET name = 'Demo User', role = 'analyst' WHERE email = 'demo@nexus.io';

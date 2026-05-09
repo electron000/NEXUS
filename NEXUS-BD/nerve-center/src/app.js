@@ -1,42 +1,66 @@
 'use strict';
 
+/**
+ * NEXUS NERVE CENTER - Main Server
+ */
+
 require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const http = require('http');
 const { pool } = require('./config/db');
 const logger = require('./config/logger');
+const path = require('path');
+const socketService = require('./services/socketService');
 
-// Route imports
+// Routes
 const authRoutes = require('./routes/auth');
 const domainRoutes = require('./routes/domains');
-const portfolioRoutes = require('./routes/portfolio');
 const userRoutes = require('./routes/user');
-const mlRoutes = require('./routes/ml');
-const settingsRoutes = require('./routes/settings');
-
+const watchlistRoutes = require('./routes/watchlist');
+const inquiryRoutes = require('./routes/inquiries');
+const adminRoutes = require('./routes/admin');
 
 const { loadCsvData } = require('./services/csvService');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
-// ─── Security & Parsing Middleware ────────────────────────────────────────────
-app.use(helmet());
+/**
+ * SECURITY & PARSING
+ * Relaxing Helmet policies for development to allow cross-origin image loading.
+ */
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false,
+}));
+
 app.use(cors({
   origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
   credentials: true,
 }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-// ─── Request Logger ───────────────────────────────────────────────────────────
+// Static Serving for Uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+/**
+ * LOGGING
+ */
 app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`, { ip: req.ip });
   next();
 });
 
-// ─── Health Check ─────────────────────────────────────────────────────────────
+/**
+ * HEALTH MONITOR
+ */
 app.get('/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -46,21 +70,23 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-// ─── API Routes ───────────────────────────────────────────────────────────────
+/**
+ * ROUTE REGISTRATION
+ */
 app.use('/api/auth',      authRoutes);
 app.use('/api/domains',   domainRoutes);
-app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/user',      userRoutes);
-app.use('/api/ml',        mlRoutes);
-app.use('/api/user/settings', settingsRoutes);
+app.use('/api/watchlist', watchlistRoutes);
+app.use('/api/inquiries', inquiryRoutes);
+app.use('/api/admin',     adminRoutes);
 
-
-// ─── 404 Handler ─────────────────────────────────────────────────────────────
+/**
+ * ERROR HANDLING
+ */
 app.use((_req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error('Unhandled error', { message: err.message, stack: err.stack });
   const status = err.status || 500;
@@ -69,13 +95,16 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, async () => {
+/**
+ * START
+ */
+server.listen(PORT, async () => {
   try {
+    socketService.init(server);
     await loadCsvData();
-    logger.info(`Nexus Nerve Center running on port ${PORT}`);
+    logger.info(`Nexus Nerve Center running on port ${PORT} (WebSockets Enabled)`);
   } catch (err) {
-    logger.error('Failed to initialize CSV data. App starting without ML data.', { error: err.message });
+    logger.error('Initialization error', { error: err.message });
     logger.info(`Nexus Nerve Center running on port ${PORT}`);
   }
 });

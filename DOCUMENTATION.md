@@ -1,65 +1,66 @@
 # NEXUS System Documentation 🌐
 
-Welcome to the comprehensive documentation for the **NEXUS Digital Asset Terminal**. This document explains the high-level architecture, core features, and technical workflows that power the platform.
+Master guide for the **NEXUS Digital Asset Terminal**.
 
 ---
 
 ## 🏗 High-Level System Architecture
 
-NEXUS is built using a microservices-inspired architecture, separating the user interface, orchestration logic, and machine learning intelligence into three distinct layers.
+NEXUS uses a specialized triple-layer architecture to decouple user experience, business logic, and machine learning intelligence.
 
 ```mermaid
 graph TD
     subgraph "Frontend Layer (NEXUS-FD)"
         UI["Next.js 14 Dashboard"]
         State["Zustand State Store"]
-        SSE_Listener["SSE Client"]
+        SSE_Listener["SSE Client (Valuation Stream)"]
+        WS_Client["Socket.IO Client (Live Chat)"]
     end
 
     subgraph "Orchestration Layer (NEXUS-BD: Nerve Center)"
-        API_GW["Express API Gateway"]
-        Auth["JWT Auth Service"]
-        Job_Manager["Async Job Manager"]
+        API_GW["Express API Gateway (Port 4000)"]
+        Auth["Session Auth Service"]
         Registrar_Proxy["Registrar Orchestrator"]
+        WS_Server["Socket.IO Server (Inquiry Rooms)"]
         DB[(PostgreSQL)]
     end
 
     subgraph "Intelligence Layer (NEXUS-BD: Intelligence Core)"
-        FastAPI["FastAPI Scorer"]
+        FastAPI["FastAPI Scorer (Port 8000)"]
         XGBoost["XGBoost ML Model"]
-        LLM["Semantic LLM Analysis"]
-        Trend_Scraper["Google Trends Scraper"]
+        LLM["Semantic Brandability Analysis"]
+        Trend_Logic["Trend Momentum Engine"]
     end
 
     subgraph "External Integrations"
-        Registrars["Registrar APIs (Porkbun, CF, GD)"]
-        OpenAI["OpenAI / Gemini"]
+        Registrars["Registrar APIs (GoDaddy, Porkbun, Name.com)"]
+        RDAP["RDAP/WHOIS Network"]
     end
 
-    %% Connections
     UI <--> State
-    UI -- "REST / JWT" --> API_GW
+    UI -- "REST / Cookie Auth" --> API_GW
     SSE_Listener -- "EventSource (SSE)" --> API_GW
-    
-    API_GW -- "Auth Validation" --> Auth
+    WS_Client <--> WS_Server
+
     API_GW -- "Data Persistence" --> DB
     API_GW -- "Fetch Pricing" --> Registrar_Proxy
     Registrar_Proxy <--> Registrars
-    
+
     API_GW -- "Request Scoring" --> FastAPI
     FastAPI -- "Valuation Logic" --> XGBoost
-    FastAPI -- "Semantic Analysis" --> LLM
-    LLM <--> OpenAI
-    FastAPI -- "Popularity Check" --> Trend_Scraper
+    FastAPI --> LLM
+    FastAPI --> Trend_Logic
 ```
+
+> **Note on real-time transports**: SSE is used exclusively for the domain valuation pipeline (one-directional server push). Socket.IO provides the bidirectional channel for live messaging within inquiry threads.
 
 ---
 
 ## 🔑 1. Authentication & Security Flow
 
-NEXUS uses a strict institutional-grade authentication flow based on **JSON Web Tokens (JWT)**.
+NEXUS implements session-based security using **HttpOnly Cookies**.
 
-### Flowchart: User Authentication
+### Flowchart: Secure Session Lifecycle
 ```mermaid
 sequenceDiagram
     participant User
@@ -69,185 +70,143 @@ sequenceDiagram
 
     User->>FD: Enter Credentials
     FD->>NC: POST /api/auth/login
-    NC->>DB: Verify Email & Hash
-    DB-->>NC: User Data
-    NC->>NC: Generate JWT (Short-lived)
-    NC-->>FD: Set-Cookie (httpOnly) + User Info
-    FD->>FD: Initialize Zustand Auth Store
-    Note over FD: User Redirected to Dashboard
+    NC->>DB: Verify Identity
+    DB-->>NC: User Profile (id, email, name, role, is_admin, kyc_status)
+    NC->>NC: Create Signed Session
+    NC-->>FD: Set-Cookie (connect.sid, httpOnly)
+    FD->>FD: Initialize Zustand Store
+    Note over FD: Protected Routes Activated
+    Note over FD: Admin routes additionally check is_admin flag
 ```
 
 ---
 
-## 📈 2. Domain Valuation Pipeline (Feature: Domain Terminal)
+## 📈 2. Domain Valuation Pipeline
 
-The Domain Terminal utilizes a multi-stage pipeline to synthesize a real-time valuation. This process is streamed to the frontend via **Server-Sent Events (SSE)** to provide instant feedback.
+The Domain Terminal uses a multi-stage pipeline streamed via **Server-Sent Events (SSE)**.
 
-### Flowchart: Valuation Logic
 ```mermaid
 flowchart TD
-    Start([User Search]) --> Request[Nerve Center: Open SSE Stream]
-    Request --> Stage1[Stage 1: Registrar Discovery]
-    Stage1 --> P1[Fetch Porkbun Pricing]
-    Stage1 --> P2[Fetch Cloudflare Data]
-    Stage1 --> P3[Check GoDaddy OTE]
-    
-    P1 & P2 & P3 --> Aggregator[Aggregate TCO Model]
-    Aggregator --> Stage2[Stage 2: Intelligence Scoring]
-    
-    Stage2 --> ML[XGBoost Quant Score]
-    Stage2 --> SEM[LLM Semantic Grade]
-    Stage2 --> TRD[Google Trends Velocity]
-    
-    ML & SEM & TRD --> Synthesis[Final Nexus Score Synthesis]
-    Synthesis --> Output[Stream Result to UI]
-    Output --> End([Valuation Complete])
+    Start([User Search]) --> Intent{User Mode?}
+    Intent -- Acquisition --> Stage1[Registrar Discovery]
+    Intent -- Appraisal --> StageApp[ML Appraisal]
+    Intent -- Exchange --> StageOwn[Ownership Discovery]
+
+    Stage1 --> P1[GoDaddy] & P2[Porkbun] & P3[Name.com]
+    StageOwn --> DB_Lookup[(NEXUS Portfolio)] & RDAP[RDAP/WHOIS]
+    StageApp --> ML[XGBoost Pipeline]
+
+    ML --> Synthesis[Nexus Score Synthesis]
+    Synthesis --> Output[Stream to UI via SSE]
+    Output --> Results["Domain Header (name, grade, trust %, summary, tags)"]
 ```
+
+### SSE Progress Phases
+Phases are emitted in sequence with a `pct` progress value:
+
+| Phase Label | What Happens |
+| :--- | :--- |
+| `Scraping Registrars...` | Live pricing fetched from GoDaddy, Porkbun, Name.com |
+| `Analyzing Linguistics...` | LLM semantic and brandability scoring |
+| `Ownership Analysis...` | RDAP/WHOIS lookup + NEXUS portfolio cross-check |
+| `Synthesizing Intelligence...` | Weighted score composition and FMV appraisal |
+| `complete` | Full `DomainValuationResponse` emitted on `complete` event |
 
 ---
 
-## 📂 3. Portfolio Auditor Flow (Feature: Bulk Analysis)
-
-The Auditor allows users to process thousands of domains asynchronously. It uses a background job system to prevent UI blocking.
-
-### Flowchart: Async Job Lifecycle
-```mermaid
-stateDiagram-v2
-    [*] --> Upload: User Uploads CSV
-    Upload --> Pending: Nerve Center Creates Job Record
-    Pending --> Processing: Job Worker Picks Up Task
-    
-    state Processing {
-        [*] --> Fetching: Multi-Registrar Price Checks
-        Fetching --> Scoring: Intelligence Core Valuations
-        Scoring --> Aggregating: Synthesize Final Dataset
-    }
-    
-    Processing --> Complete: Job Result Saved to DB
-    Processing --> Failed: Error Logged
-    
-    Complete --> [*]
-    Failed --> [*]
-    
-    note right of Processing
-        Frontend polls /api/portfolio/status/:jobId
-        every 3 seconds to update progress bars.
-    end
-```
-
----
-
-## 🗄 4. Data Model (Entity Relationship)
-
-The core database structure ensures scalability and user-data isolation.
+## 🗄 3. Data Model (Entity Relationship)
 
 ```mermaid
 erDiagram
-    USERS ||--o{ PORTFOLIO_JOBS : owns
-    USERS ||--|| USER_SETTINGS : configures
+    USERS ||--o{ PORTFOLIO : owns
+    USERS ||--o{ WATCHLIST : monitors
+    USERS ||--o{ INQUIRIES : sends
+    PORTFOLIO ||--o{ INQUIRIES : receives
+
     USERS {
         uuid id PK
         string email
         string password_hash
-        jsonb preferences
+        string name
+        enum role "investor | brand_manager | analyst"
+        boolean is_admin
+        enum kyc_status "unverified | pending | verified | rejected"
         datetime created_at
     }
-    PORTFOLIO_JOBS {
+
+    PORTFOLIO {
         uuid id PK
         uuid user_id FK
-        string status
-        jsonb results
-        string error
-        datetime completed_at
+        string domain
+        enum verification_status "pending | verified | failed"
+        string verification_token
+        boolean is_for_sale
+        numeric asking_price
+        datetime created_at
     }
-    DOMAIN_CACHE {
-        string domain PK
-        boolean available
-        numeric price
-        jsonb nexus_score
-        datetime expires_at
+
+    WATCHLIST {
+        uuid id PK
+        uuid user_id FK
+        string domain
+        datetime added_at
+        numeric alert_price
+        text notes
+    }
+
+    INQUIRIES {
+        uuid id PK
+        uuid sender_id FK
+        string domain
+        numeric offer_price
+        text message
+        enum status "open | closed"
+        datetime created_at
     }
 ```
 
 ---
 
-## 🛠 Feature-by-Feature Deep Dive
+## 🛠 Feature Deep Dive
 
-### 1. The Domain Terminal
-- **Purpose**: Real-time evaluation of single domains.
-- **Key Logic**:
-    - **TCO (Total Cost of Ownership)**: Calculates 1-year, 5-year, and 10-year costs across different registrars.
-    - **Arbitrage Detection**: Flags if a domain is significantly cheaper at one registrar versus others.
-    - **Investment Grade**: Uses a proprietary algorithm to assign grades from **S (Elite)** to **F (Junk)**.
+### 1. The Triple Terminal
+- **Acquisition**: Registrar arbitrage table (registration, renewal, transfer, privacy costs per registrar), Scarcity Index gauge, and a primary recommendation block.
+- **Appraisal**: Fair Market Value (FMV) and ML-predicted sale price panels, Semantic Score gauge (brand affinity), Velocity gauge (search trend momentum).
+- **Exchange**: RDAP/WHOIS ownership snapshot (owner, country, last updated), P2P offer panel for Nexus-member assets, watchlist fallback for external assets, Nexus Trust Index gauge.
 
-### 2. Portfolio Auditor
-- **Purpose**: Bulk valuation and health checks for large portfolios.
-- **Capabilities**:
-    - Supports CSV uploads up to 10k rows.
-    - **Manual Mode**: A real-time editable spreadsheet interface for "live-modelling" portfolios without file uploads.
-    - **Auto-Discovery**: For Cloudflare users, it can automatically pull all domains from their account for auditing.
+### 2. Nerve Center (Dashboard Overview)
+Real-time metrics updated every 30 seconds from the Nerve Center API. Each metric includes a `change` percentage shown as a trend indicator:
 
-### 3. Nerve Center (Dashboard)
-- **Purpose**: High-level financial overview.
-- **Metrics**:
-    - **Portfolio Net Worth**: Sum of all estimated asset values.
-    - **Monthly Burn**: Total renewal costs normalized per month.
-    - **TLD Velocity**: Tracking which extensions are trending in the market.
+- **Portfolio Value**: Sum of verified asset appraisals.
+- **Active Domains**: Count of technically verified portfolio holdings.
+- **Monthly Revenue**: Projected income from active P2P inquiries.
+- **Watchlist Size**: Total domains currently being monitored.
 
-### 4. Settings & Integrations
-- **Purpose**: Secure management of API credentials.
-- **Registrar Support**:
-    - **Porkbun**: Direct API for production pricing.
-    - **Cloudflare**: Global API integration for management.
-    - **GoDaddy**: OTE (Test) environment integration.
+### 3. Messages (Communications Hub)
+- **Inbox**: Lists all inquiries for the authenticated user — shows domain, counterparty email, offer price, and status.
+- **NexusChat**: Real-time Socket.IO thread per inquiry. Messages are fetched via REST on load, then kept live via `join_inquiry` room events.
+- **Inquiry Creation**: Launched from the Exchange terminal view via `InquiryModal` — accepts a free-text message and optional offer price (`POST /api/inquiries`).
 
----
+### 4. Portfolio & Verification
+- **Domain Listing**: Add a domain to your portfolio (`POST /api/user/portfolio`).
+- **Ownership Proof**: Choose DNS TXT record or HTML meta tag method. The Nerve Center verifies via `dns.resolveTxt` or HTTP crawl.
+- **KYC Submission**: Multi-step form collecting personal details and Aadhaar (front + back). Submitted to admin queue for manual review.
 
-## 🤖 Intelligence Core & Model Accuracy
+### 5. Watchlist
+- Add any domain from the Terminal with one click (persisted in Zustand + localStorage).
+- View add date and optional notes per entry.
+- Re-run analysis on any watched domain directly from the list.
 
-The **Intelligence Core** is the heart of the NEXUS valuation engine. It uses an **XGBoost Regressor** to provide a quantitative baseline score for any domain based on linguistic and structural features.
+### 6. Admin Dashboard
+- Accessible only to users with `is_admin: true`.
+- **Stats Panel**: `totalUsers`, `totalSellers`, `totalInquiries`, `totalPortfolioDomains`, `activeConnections`.
+- **KYC Queue**: Table of pending verification requests with Aadhaar document review and approve/reject actions.
 
-### Model Performance (Benchmark: May 2026)
-
-The model is evaluated against a curated benchmark dataset of 4,000 domains. 
-
-- **Overall Closeness Accuracy**: **72.58%**
-- **High-Value Asset Accuracy**: **94.8%**
-- **Trend Correlation**: **0.47** (Strong directional alignment with market prices)
-
-### Accuracy Breakdown by Tier
-
-| Domain Tier | Accuracy | Description |
-| :--- | :--- | :--- |
-| **High Tier** | **94.8%** | Exceptional at identifying and valuing premium, liquid assets. |
-| **Medium Tier** | **71.1%** | Reliable for standard brandable domains and common extensions. |
-| **Low Tier** | **65.9%** | Tends to be "optimistic"; current focus of calibration efforts. |
-
-### Running Self-Evaluations
-
-Developers can run a local accuracy audit at any time using the dedicated evaluation suite:
-```powershell
-cd NEXUS-BD/intelligence-core
-python scripts/evaluate_model.py      # Test-only mode
-python scripts/train_test_eval.py    # Proper 80/20 split test
-```
-
-### Retraining for Production
-
-To update the live model with new data from `data/nexus_domain_india_4000.csv`:
-```powershell
-cd NEXUS-BD/intelligence-core
-python scripts/train_production_model.py
-```
+### 7. Integrated Verification
+- **DNS Method**: TXT record lookup for `nexus-site-verification=[TOKEN]`.
+- **HTML Method**: Meta tag crawl for `<meta name="nexus-site-verification" content="[TOKEN]">`.
+- **Identity (KYC)**: Aadhaar-based manual administrative review. Approval sets `kyc_status` to `verified` and grants the "Verified Seller" badge platform-wide.
 
 ---
 
-## 🚀 Performance Optimizations
-
-1. **Domain Caching**: To minimize registrar API costs and latency, successful searches are cached for 24 hours.
-2. **SSE Streaming**: Instead of waiting 10 seconds for a full valuation, users see data as it's discovered (Registrar pricing first, then ML score, then Semantic analysis).
-3. **Zustand Persistence**: Auth state and dashboard preferences are persisted in `localStorage` to ensure a seamless experience on reload.
-
----
-
-**NEXUS** — *The future of digital asset management.*
+**NEXUS** — *Institutional Intelligence for the Digital Asset Class.*

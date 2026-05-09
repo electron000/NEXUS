@@ -1,147 +1,90 @@
-# NEXUS Setup & Installation Guide 🚀
+# NEXUS Setup & Installation 🚀
 
-This guide provides step-by-step instructions to get the full NEXUS ecosystem running on your local machine.
-
-## 🛠 Prerequisites
-
-Ensure you have the following installed:
-- **Node.js** (v18+ recommended)
-- **Python** (v3.10+ recommended)
-- **PostgreSQL** (v14+ recommended)
-- **NPM** or **Yarn**
+Follow these steps to initialize the NEXUS production-ready stack.
 
 ---
 
-## 1. Backend 1: Nerve Center (Node.js) 🧠
-The Nerve Center handles authentication, registrar integrations, and portfolio job orchestration.
+## 🛠 1. Backend: Nerve Center (Port 4000)
 
-### Installation
-1. Navigate to the Nerve Center directory:
+1. **Install Dependencies**:
    ```bash
    cd NEXUS-BD/nerve-center
-   ```
-2. Install dependencies:
-   ```bash
    npm install
    ```
-
-### Configuration
-1. Create a `.env` file from the example:
-   ```bash
-   cp .env.example .env
+2. **Environment Configuration**:
+   Create a `.env` file:
+   ```env
+   PORT=4000
+   FRONTEND_ORIGIN=http://localhost:3000
+   DB_HOST=localhost
+   DB_USER=your_user
+   DB_PASSWORD=your_password
+   DB_NAME=nexus
+   INTERNAL_API_KEY=your_shared_secret
+   INTELLIGENCE_CORE_URL=http://localhost:8000
+   GODADDY_API_KEY=...
+   PORKBUN_API_KEY=...
+   NAMECOM_API_TOKEN=...
    ```
-2. Fill in the required variables in `.env`:
-   - `JWT_SECRET`: A long random string for security.
-   - `DB_HOST`, `DB_USER`, `DB_PASSWORD`: Your PostgreSQL credentials.
-   - `INTERNAL_API_KEY`: A shared secret string (must match Intelligence Core).
-
-### Database Setup
-1. Create a database named `nexus` in PostgreSQL.
-2. Run migrations to create tables:
+3. **Database Migration**:
    ```bash
-   node src/db/migrate.js
+   npm run migrate
    ```
-
-### Execution
-Start the development server:
-```bash
-npm run dev
-```
-The server will run at `http://localhost:3001` (or your configured `PORT`).
+4. **Execution**:
+   ```bash
+   npm run dev
+   ```
 
 ---
 
-## 2. Backend 2: Intelligence Core (Python) 🤖
-The Intelligence Core handles ML scoring, semantic analysis, and trend momentum tracking.
+## 🤖 2. Backend: Intelligence Core (Port 8000)
 
-### Installation
-1. Navigate to the Intelligence Core directory:
+1. **Setup Environment**:
    ```bash
    cd NEXUS-BD/intelligence-core
-   ```
-2. Create and activate a virtual environment:
-   ```bash
    python -m venv venv
-   # Windows:
-   venv\Scripts\activate
-   # macOS/Linux:
-   source venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
+   source venv/bin/activate  # venv\Scripts\activate on Windows
    pip install -r requirements.txt
    ```
-
-### Configuration
-1. Create a `.env` file from the example:
-   ```bash
-   cp .env.example .env
+2. **Environment Configuration**:
+   Create a `.env` file:
+   ```env
+   INTERNAL_API_KEY=your_shared_secret (must match Nerve Center)
+   NERVE_CENTER_ORIGIN=http://localhost:4000
+   OPENAI_API_KEY=... (Optional for semantic scoring)
    ```
-2. Fill in the required variables in `.env`:
-   - `INTERNAL_API_KEY`: Must match the value in Nerve Center.
-   - `OPENAI_API_KEY` or `GEMINI_API_KEY`: Required for semantic scoring.
-
-### Execution
-Start the FastAPI server:
-```bash
-python -m uvicorn app.main:app --reload --port 8000
-```
+3. **Execution**:
+   ```bash
+   python -m uvicorn app.main:app --reload --port 8000
+   ```
 
 ---
 
-## 3. Frontend: Terminal (Next.js) 💻
-The Frontend provides the institutional terminal interface and dashboard.
+## 💻 3. Frontend: NEXUS Terminal (Port 3000)
 
-### Installation
-1. Navigate to the Frontend directory:
+1. **Install Dependencies**:
    ```bash
    cd NEXUS-FD
-   ```
-2. Install dependencies:
-   ```bash
    npm install
    ```
-
-### Configuration
-1. Create a `.env.local` file:
-   ```bash
-   cp .env.local.example .env.local  # If example exists, or create manually
-   ```
-2. Ensure the following variables are set:
+2. **Environment Configuration**:
+   Create a `.env.local` file:
    ```env
-   NEXT_PUBLIC_API_URL=http://localhost:3001
-   NEXT_PUBLIC_INTELLIGENCE_API_URL=http://localhost:8000
+   NEXT_PUBLIC_API_URL=http://localhost:4000
+   ```
+3. **Execution**:
+   ```bash
+   npm run dev
    ```
 
-### Execution
-Start the development server:
-```bash
-npm run dev
-```
-Access the terminal at `http://localhost:3000`.
+---
+
+## 🛡️ Production Security Notes
+
+- **Authentication**: NEXUS uses HttpOnly cookies. Ensure `FRONTEND_ORIGIN` is correctly set in the backend to allow cross-origin credential passing.
+- **Verification**: Use the `demo.nexus.io` domain to test the "Verified" asset flow instantly.
+- **Registrar APIs**: You must have valid API keys for GoDaddy, Porkbun, or Name.com to receive live pricing signals.
 
 ---
 
-## 📡 External API Key Setup
-
-To enable live market data, you need to configure your registrar keys.
-
-### 1. Porkbun (Live Pricing)
-- Get your **API Key** and **Secret Key** from the [Porkbun API Console](https://porkbun.com/account/api).
-- Add them in the NEXUS **Settings** page (stored in your encrypted user profile).
-
-### 2. Cloudflare (Domain Management)
-- Get your **Global API Key** and **Email** from your [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens).
-- Add them in the NEXUS **Settings** page.
-
-### 3. GoDaddy (Availability)
-- Get your **Key** and **Secret** from the [GoDaddy Developer Portal](https://developer.godaddy.com/keys).
-- **Note**: NEXUS currently uses the OTE (Test) environment. Transition to Production requires 50+ domains in your GoDaddy account.
-
----
-
-## 🛠 Troubleshooting
-
-- **CORS Errors**: Ensure `FRONTEND_ORIGIN` in Nerve Center's `.env` matches your frontend URL (`http://localhost:3000`).
-- **DB Connection**: Verify that PostgreSQL is running and the credentials in `.env` are correct.
-- **ML Scoring Failure**: Ensure Intelligence Core is running and the `INTERNAL_API_KEY` matches between services.
+**NEXUS** — *Institutional Intelligence for the Digital Asset Class.*

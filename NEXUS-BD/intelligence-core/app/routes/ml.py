@@ -34,5 +34,7 @@ async def nexus_score(req: NexusScoreRequest):
         quantitative_baseline=scores["quantitativeBaseline"],
         semantic_score=scores["semanticScore"],
         trend_momentum=scores["trendMomentum"],
+        predicted_price=scores["predictedPrice"],
+        predicted_tier=scores["predictedTier"],
         model_used="xgboost",
     )

@@ -1,136 +1,104 @@
 # NEXUS Digital Asset Terminal 🌐
 
-NEXUS is a high-fidelity, professional-grade digital asset terminal designed for domain investors, brand managers, and financial analysts. It synthesizes real-time market data, machine learning valuations, and multi-registrar arbitrage signals into a unified institutional interface.
+NEXUS is an institutional-grade digital asset terminal designed for domain investors, brand managers, and financial analysts. It synthesizes real-time registrar data, machine learning valuations, and peer-to-peer exchange logic into a unified, high-fidelity interface.
 
 ---
 
 ## 🏗 System Architecture
 
-The NEXUS ecosystem is composed of three primary layers, ensuring high performance, scalability, and intelligence.
+The NEXUS ecosystem is built on a specialized triple-layer stack designed for absolute data integrity and security.
 
 ### 1. **NEXUS-FD (Frontend)**
 - **Framework**: Next.js 14 (App Router)
-- **State Management**: Zustand (with session & persistence layers)
-- **Styling**: Premium "Terminal" aesthetic using Glassmorphism and specialized CSS animations.
-- **Code Quality**: 100% ESLint compliant (0 errors, 0 warnings).
+- **State Management**: Zustand (Persisted to localStorage)
+- **Security**: Cookie-based session management (HttpOnly)
+- **User Roles**: `investor`, `brand_manager`, `analyst`
 - **Core Views**:
-  - **Nerve Center**: Real-time portfolio metrics and market sentiment.
-  - **Domain Terminal**: Real-time valuation engine with SSE streaming.
-  - **Portfolio Auditor**: Bulk CSV analysis with async job polling.
+  - **Nerve Center** (`/overview`): Real-time portfolio metrics and verified intelligence feed.
+  - **Domain Terminal** (`/terminal`): Triple-mode engine (Acquisition, Appraisal, Exchange).
+  - **My Portfolio** (`/portfolio`): Technical asset verification (DNS/HTML) and KYC management.
+  - **Watchlist** (`/watchlist`): Monitor tracked domains for availability or listing changes.
+  - **Messages** (`/messages`): Secure inquiry inbox and real-time P2P negotiation chat.
+- **Public Surface**:
+  - **Marketing/Landing Page** (`/`): Feature overview and onboarding entry point.
+  - **Auth Pages**: `/login`, `/register`
+  - **Unauthorized** (`/unauthorized`): Access-denied redirect target.
 
-### 2. **NEXUS-BD: Nerve Center (Backend)**
+### 2. **NEXUS-BD: Nerve Center (API Gateway)**
 - **Runtime**: Node.js / Express
+- **Port**: `4000`
 - **Responsibilities**:
-  - **Registrar Orchestration**: Dynamic live pricing from multiple registrars.
-  - **Job System**: Asynchronous batch processing for portfolio audits.
-  - **Security**: JWT-based institutional authentication and per-user encrypted settings.
-  - **Streaming**: Server-Sent Events (SSE) for real-time valuation transparency.
+  - **Orchestration**: Real-time integration with GoDaddy, Porkbun, and Name.com.
+  - **Verification Engine**: Automated ownership validation via DNS TXT record and HTML meta tag crawling.
+  - **Nexus Connect**: Secure inquiry creation and P2P messaging hub.
+  - **Data Streaming**: Server-Sent Events (SSE) for domain valuation transparency.
+  - **Real-Time Messaging**: Socket.IO for live bidirectional chat within active inquiries.
 
 ### 3. **NEXUS-BD: Intelligence Core (ML Service)**
 - **Runtime**: Python / FastAPI
+- **Port**: `8000`
 - **Intelligence**:
-  - **XGBoost Quantitative Score**: Derived from a 4,000+ row historical domain dataset.
-  - **LLM Semantic Score**: Linguistic analysis via OpenAI/Gemini.
-  - **Momentum Tracking**: Real-time Google Trends integration for "Trend Score" synthesis.
+  - **XGBoost Pipeline**: Predictive valuation baseline trained on 4,000+ domain sales.
+  - **Semantic Scoring**: Brandability and linguistic sentiment analysis.
+  - **Trend Analysis**: Market velocity tracking and search momentum synthesis.
 
-### **Service Mapping**
-
-| Service | Stack | Port | Description |
-|---|---|---|---|
-| **Terminal (FD)** | Next.js 14 | `3000` | Institutional UI & Dashboard |
-| **Nerve Center (BD)** | Node.js | `3001` | API Gateway & Orchestration |
-| **Intelligence Core (BD)** | Python | `8000` | ML Scoring & LLM Logic |
-| **Database** | PostgreSQL | `5432` | User Profiles & Job State |
+### 4. **Admin Dashboard**
+- **Route**: `/admin/dashboard` (protected by `is_admin` flag)
+- **Capabilities**: Platform-wide stats (users, sellers, inquiries, active portfolio domains), pending KYC queue review (approve/reject with reason), Aadhaar document inspection.
 
 ---
 
-## 📡 Multi-Registrar Integration Status
+## 📡 Production Connectivity
 
+NEXUS utilizes direct, authentic API integrations for 100% data fidelity.
 
-NEXUS leverages direct API integrations to provide real-time arbitrage signals. 
-
-| Registrar | Status | Mode | Features |
-|---|---|---|---|
-| **Porkbun** | ✅ Active | Production | Live Pricing, Availability, TCO Analysis |
-| **Cloudflare** | ✅ Active | Global API | Management, Discovery, Integrated Pricing |
-| **GoDaddy** | 🧪 OTE | Test | Pricing (Switching to Prod @ 50 domains) |
-| **Namecheap** | ⏳ Pending | $50 Balance | API access requires minimum account funding |
-| **Dynadot** | ⏳ Pending | Spend Req. | Requires $50+ annual spend or 10 domains |
-
-### **Integrated Utility Logic**
-- **Cloudflare Discovery**: Automatically fetches Account IDs and management metadata across the terminal and auditor.
-- **Porkbun Live Check**: Used as the primary fallback for high-fidelity pricing when other registrars are rate-limited.
-- **Global Settings**: Credentials (API Keys, Secrets, Emails) are stored securely in the database per-user, enabling personal institutional access.
+| Provider | Status | Role |
+| :--- | :--- | :--- |
+| **GoDaddy** | ✅ Active | Live Pricing & Availability |
+| **Porkbun** | ✅ Active | Renewal TCO & Arbitrage Signals |
+| **Name.com** | ✅ Active | Bulk Discovery & Registry Access |
+| **RDAP/WHOIS** | ✅ Active | Real-time Ownership Intelligence |
 
 ---
 
-## 🚀 Core Features & Functionality
+## 🚀 Core Features
 
-### 1. **The Domain Terminal (Valuation Engine)**
-Search any domain to trigger a multi-stage valuation pipeline:
-1. **Scraping**: Fetches live registrar pricing and availability.
-2. **ML Scoring**: Calculates the "Nexus Score" (0–100) and assigns an investment grade (S–F).
-3. **TCO Modeling**: Generates a 5-year Total Cost of Ownership projection (Best/Expected/Worst case).
-4. **Arbitrage Signals**: Identifies price discrepancies between registrars for immediate ROI.
+### 1. The Triple Terminal
+A dynamic valuation engine that adapts to user intent:
+- **Acquisition**: Registrar arbitrage table (registration, renewal, transfer, privacy costs), Scarcity Index gauge, and primary acquisition recommendation.
+- **Appraisal**: Fair Market Value (FMV) projection, ML-predicted sale price, Semantic Score gauge, and Velocity (Trend) gauge.
+- **Exchange**: RDAP/WHOIS ownership snapshot, P2P negotiation panel (Nexus members) or watchlist fallback (external assets), and Nexus Trust Index gauge.
 
-### 2. **The Portfolio Auditor (Bulk Analysis)**
-Upload `.csv` files (up to 10,000 rows) for background analysis:
-- **Async Processing**: Jobs run in the background; UI polls for completion.
-- **Data Enrichment**: Attaches ML scores and live market valuations to every row.
-- **Manual Mode**: Excel-style manual entry for quick "what-if" modeling.
+All results include a domain summary, tag set, grade badge (S → F), and a Trust confidence percentage.
 
-### 3. **The Nerve Center (Dashboard)**
-Institutional overview of your digital assets:
-- **Aggregated Metrics**: Total Portfolio Value, Monthly Run Rate, and CAGR.
-- **Market Pulse**: Dynamic sentiment indicators derived from current TLD velocity.
-- **Live Watchlist**: Real-time tracking of mission-critical assets.
+### 2. Ownership & Trust (KYC)
+- **Technical Validation**: Prove asset ownership via automated DNS TXT (`nexus-site-verification=[TOKEN]`) or HTML meta tag crawling.
+- **Identity Verification (KYC)**: Submit full name, address, and Aadhaar (front + back) for manual admin review. Approval grants the global "Verified Seller" badge.
+- **Admin Review**: Human-in-the-loop KYC approval via the Admin Dashboard.
 
----
+### 3. Nexus Connect (Messages)
+- **Inquiry Creation**: Initiate a purchase offer (with optional price) directly from the Exchange terminal view.
+- **Communications Hub**: Inbox listing all active inquiries with counterparty, domain, and offer price.
+- **Real-Time Chat**: Socket.IO–powered bidirectional messaging within each inquiry thread.
 
-## 🛡 Security & Best Practices
-
-- **Zero-Credential Policy**: No API keys are hardcoded. All integrations use environment variables or database-encrypted settings.
-- **Robust .gitignore**: Protecting environment secrets and build artifacts across all repositories.
-- **Strict Typing**: TypeScript interfaces unify the FD and BD data contracts, preventing runtime failures.
-- **Clean Code**: Verified via `npm run lint` with 100% compliance.
+### 4. Watchlist
+- Bookmark any domain from the Terminal with one click.
+- View all tracked assets with add date and notes.
+- One-click re-analysis from the watchlist back into the Terminal.
 
 ---
 
 ## 🛠 Setup & Development
 
-### **Root Configuration**
-1. Clone the repository and submodules.
-2. Configure `.env` in `NEXUS-BD/nerve-center` and `NEXUS-BD/intelligence-core`.
-3. Run `docker-compose up --build` for the full stack.
+Detailed instructions are available in [SETUP.md](./SETUP.md).
 
-### **Registrar Credentials**
-To activate live pricing, navigate to **Settings** in the dashboard and input your API keys for:
-- **GoDaddy**: Key & Secret
-- **Porkbun**: Key & Secret
-- **Cloudflare**: Email & Global Key
-
----
-
-## 📝 Roadmap & Pending Requirements
-
-- **Namecheap/Dynadot Production**: Will be activated once the project account meets the minimum registrar-specific funding thresholds.
-- **GoDaddy Production Migration**: Planned for the next development phase once the portfolio reach exceeds 50 domains.
-- **Enhanced ML Training**: Incorporating real-time sale data from Afternic/Sedo APIs.
-
----
-
-## 📖 API Reference (Key Endpoints)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| **POST** | `/api/auth/signup` | Register new institutional account |
-| **POST** | `/api/auth/login` | Authenticate & retrieve JWT |
-| **POST** | `/api/domains/check` | Batch availability check (up to 50 domains) |
-| **GET** | `/api/domains/valuation-stream/:domain` | SSE stream for real-time ML valuation |
-| **POST** | `/api/portfolio/upload` | Async CSV audit upload |
-| **GET** | `/api/portfolio/status/:jobId` | Poll audit job status & results |
+1. **Install Dependencies**: `npm install` in FD/BD and `pip install` in ML Core.
+2. **Configure Secrets**: Populate `.env` files with database and registrar API keys.
+3. **Launch Stack**:
+   - **Frontend**: `npm run dev` (Port 3000)
+   - **Nerve Center**: `npm run dev` (Port 4000)
+   - **Intelligence Core**: `uvicorn app.main:app` (Port 8000)
 
 ---
 
 **NEXUS** — *Institutional Intelligence for the Digital Asset Class.*
-

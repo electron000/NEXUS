@@ -13,20 +13,6 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 
--- ─── Portfolio Jobs ───────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS portfolio_jobs (
-    id           UUID PRIMARY KEY,
-    user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    status       TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'complete', 'failed')),
-    results      JSONB,
-    error        TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    completed_at TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_portfolio_jobs_user_id ON portfolio_jobs (user_id);
-CREATE INDEX IF NOT EXISTS idx_portfolio_jobs_status  ON portfolio_jobs (status);
-
 -- ─── Domain Cache ─────────────────────────────────────────────────────────────
 -- Short-lived cache to reduce hammering registrar APIs for the same domains.
 CREATE TABLE IF NOT EXISTS domain_cache (

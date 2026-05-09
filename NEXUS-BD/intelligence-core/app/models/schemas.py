@@ -34,5 +34,10 @@ class NexusScoreResponse(BaseModel):
         ..., ge=-100, le=100,
         description="Google Trends momentum (-100 declining → +100 surging)."
     )
-    # Expose whether we fell back to heuristics so callers can react
+    predicted_price: float = Field(default=0.0, description="Predicted aftermarket price from user model.")
+    predicted_tier: str = Field(default="low", description="Predicted investment tier (low | medium | high).")
     model_used: str = Field(default="xgboost", description="xgboost | heuristic | llm-only")
+
+    model_config = {
+        "protected_namespaces": ()
+    }
