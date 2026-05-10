@@ -59,8 +59,6 @@ NEXUS-BD/nerve-center/test_*.js
 NEXUS-BD/nerve-center/save_*.js
 NEXUS-BD/nerve-center/revert_*.js
 NEXUS-BD/nerve-center/database.sqlite
-NEXUS-BD/intelligence-core/models/*.pkl
-NEXUS-BD/intelligence-core/data/*.csv
 
 # ─── Artifacts ──────────────────────────────────────────────────────────────
 .gemini/
