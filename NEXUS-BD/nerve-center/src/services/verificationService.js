@@ -4,29 +4,24 @@ const dns = require('dns').promises;
 const axios = require('axios');
 const logger = require('../config/logger');
 
-/**
- * TECHNICAL VERIFICATION SERVICE
- * Handles real-world ownership validation via DNS and HTML.
- */
+const { Resolver } = require('dns').promises;
+const resolver = new Resolver();
 
-/**
- * Verify ownership via DNS TXT record.
- */
+// uses Google's DNS (8.8.8.8) or Cloudflare (1.1.1.1)
+resolver.setServers(['8.8.8.8', '1.1.1.1']);
+
+//  Verify ownership via DNS TXT record.
 async function verifyDNS(domain, token) {
   try {
-    // We check global nameservers for a TXT record
-    const records = await dns.resolveTxt(domain);
+    const records = await resolver.resolveTxt(domain);
     const flatRecords = records.flat();
     const expected = `nexus-site-verification=${token}`;
     
-    // Some registrars wrap TXT records in quotes or add extra whitespace
     const verified = flatRecords.some(r => r.trim().includes(expected));
     
     return { success: verified, method: 'dns' };
   } catch (err) {
     logger.debug('DNS verification process finished', { domain, code: err.code });
-    // ENODATA means the domain exists but has no TXT records
-    // ENOTFOUND means the domain itself couldn't be resolved
     return { success: false, method: 'dns', error: err.code };
   }
 }
