@@ -11,3 +11,4 @@ models/*.pkl
 dist/
 build/
 .DS_Store
+my_user_data.txt
