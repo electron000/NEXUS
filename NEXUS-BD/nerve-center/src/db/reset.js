@@ -1,10 +1,10 @@
 'use strict';
 
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const { pool } = require('../config/db');
 const logger = require('../config/logger');
-const fs = require('fs');
-const path = require('path');
 
 async function reset() {
   const client = await pool.connect();
