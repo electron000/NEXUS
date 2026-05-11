@@ -39,11 +39,10 @@ async function getNexusScore(domain) {
     
     // We translate the Python data format into something the rest of our app understands
     return {
-      quantitative: data.quantitative_baseline,
+      model:        data.model_score,
       semantic:     data.semantic_score,
-      trend:        data.trend_momentum,
-      predictedPrice: data.predicted_price || (data.quantitative_baseline * 50),
-      tier:         data.predicted_tier || (data.quantitative_baseline >= 80 ? 'premium' : 'mid'),
+      predictedPrice: data.predicted_price || (data.model_score * 50),
+      tier:         data.predicted_tier || (data.model_score >= 80 ? 'high' : data.model_score >= 50 ? 'medium' : 'low'),
       _source: 'intelligence-core'
     };
   } catch (err) {
@@ -77,10 +76,9 @@ function fallbackScore(domain) {
   const seed = domain.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const norm = (n, lo, hi) => lo + (n % (hi - lo));
   return {
-    quantitative: norm(seed,      40, 85),
+    model:        norm(seed,      40, 85),
     semantic:     norm(seed * 3,  30, 90),
-    trend:        norm(seed * 7,  20, 75),
-    predictedPrice: norm(seed * 11, 10, 5000),
+    predictedPrice: norm(seed * 11, 10, 5000) * 83.5,
     tier: 'low',
     _source: 'procedural-fallback',
   };

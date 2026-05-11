@@ -16,9 +16,9 @@ router = APIRouter()
     response_model=NexusScoreResponse,
     summary="Calculate the Nexus Value Score for a domain",
     description=(
-        "Runs the tier model (model_score), semantic quality (LLM), "
-        "and trend momentum (Google Trends) pipelines concurrently and returns "
-        "the component scores along with price and tier predictions."
+        "Runs the tier model (model_score) and semantic quality (LLM) "
+        "pipelines concurrently and returns the component scores "
+        "along with price and tier predictions."
     ),
 )
 async def nexus_score(req: NexusScoreRequest):
@@ -33,7 +33,6 @@ async def nexus_score(req: NexusScoreRequest):
         domain=req.domain,
         model_score=scores["modelScore"],
         semantic_score=scores["semanticScore"],
-        trend_momentum=scores["trendMomentum"],
         predicted_price=scores["predictedPrice"],
         predicted_tier=scores["predictedTier"],
         model_used="random_forest",

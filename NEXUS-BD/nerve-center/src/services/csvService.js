@@ -98,9 +98,8 @@ async function predictDomainMetrics(domain) {
   const exactMatch = domainData.find(d => d.domain === normalised);
   if (exactMatch) {
     return {
-      quantitative: Math.round(exactMatch.tld_score * 100),
+      model: Math.round(exactMatch.tld_score * 100),
       semantic: Math.round(exactMatch.keyword_score * 100),
-      trend: Math.round(exactMatch.brand_score * 100),
       predictedPrice: exactMatch.price,
       tier: exactMatch.tier,
       isExact: true
@@ -128,17 +127,15 @@ async function predictDomainMetrics(domain) {
   const avg = neighbors.reduce((acc, n) => {
     acc.tld += n.tld_score;
     acc.keyword += n.keyword_score;
-    acc.brand += n.brand_score;
     acc.price += n.price;
     return acc;
-  }, { tld: 0, keyword: 0, brand: 0, price: 0 });
+  }, { tld: 0, keyword: 0, price: 0 });
 
   const k = neighbors.length;
   
   return {
-    quantitative: Math.round((avg.tld / k) * 100),
+    model: Math.round((avg.tld / k) * 100),
     semantic: Math.round((avg.keyword / k) * 100),
-    trend: Math.round((avg.brand / k) * 100),
     predictedPrice: Math.round(avg.price / k),
     tier: (avg.price / k) > 1000000 ? 'high' : (avg.price / k) > 100000 ? 'medium' : 'low',
     isExact: false

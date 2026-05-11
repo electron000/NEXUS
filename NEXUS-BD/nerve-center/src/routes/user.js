@@ -4,7 +4,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { query } = require('../config/db');
-const { verifyDNS, verifyHTML } = require('../services/verificationService');
+const { verifyDNS } = require('../services/verificationService');
 const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
@@ -115,38 +115,60 @@ router.put(
 // ─── GET /api/user/dashboard ───────────────────────────────────────────────────
 router.get('/dashboard', async (req, res) => {
   try {
-    const { predictDomainMetrics } = require('../services/csvService');
-    const { calculateRegistrarPricing } = require('../services/pricingService');
-    const { calculateAftermarketValue } = require('../services/pricingService');
+    const { getNexusScore } = require('../services/mlService');
+    const { calculateRegistrarPricing, USD_TO_INR } = require('../services/pricingService');
 
-    // 1. Get real watchlist size
-    const watchlistResult = await query(
-      'SELECT COUNT(*) as count FROM watchlist WHERE user_id = $1',
-      [req.user.id]
-    );
-    const watchlistCount = parseInt(watchlistResult.rows[0]?.count || 0, 10);
-
-    // 2. Get User Portfolio & Calculate Metrics
+    // 1. Get User Portfolio & Calculate Metrics
     const portfolioResult = await query(
-      'SELECT domain, verification_status FROM portfolio WHERE user_id = $1',
+      'SELECT id, domain, verification_status, bought_price, valuation_price FROM portfolio WHERE user_id = $1',
       [req.user.id]
     );
     const portfolioRows = portfolioResult.rows;
     const verifiedAssets = portfolioRows.filter(r => r.verification_status === 'verified');
 
     let totalValue = 0;
-    let totalHoldingCost = 0;
+    let totalInvested = 0;
+
+    const portfolioData = [];
 
     // Calculate metrics for each portfolio asset
     await Promise.all(portfolioRows.map(async (row) => {
-      const scores = await predictDomainMetrics(row.domain);
-      
-      const appraisal = calculateAftermarketValue(row.domain, scores);
-      totalValue += appraisal.value;
+      let val = parseFloat(row.valuation_price || 0);
+      let scores = { model: 50, semantic: 50 }; // Default scores for pricing if not fetched
 
-      const pricing = calculateRegistrarPricing(row.domain, scores);
-      const avgRenewal = pricing.reduce((sum, p) => sum + p.renewal, 0) / pricing.length;
-      totalHoldingCost += (avgRenewal / 12);
+      // One-time fetching: Only call the ML model if we don't have a valuation yet
+      if (val === 0) {
+        try {
+          const mlResult = await getNexusScore(row.domain);
+          val = mlResult.predictedPrice || 0;
+          scores = mlResult;
+
+          // Cache the valuation in the database
+          await query(
+            'UPDATE portfolio SET valuation_price = $1 WHERE id = $2',
+            [val, row.id]
+          );
+        } catch (mlErr) {
+          logger.error('Failed to fetch one-time valuation', { domain: row.domain, error: mlErr.message });
+        }
+      }
+
+      totalValue += val;
+
+      
+      const bPrice = parseFloat(row.bought_price || 0);
+      totalInvested += bPrice;
+
+      // Only include verified domains in the detailed table list
+      if (row.verification_status === 'verified') {
+        const growth = bPrice > 0 ? ((val - bPrice) / bPrice) * 100 : 0;
+        portfolioData.push({
+          domain: row.domain,
+          boughtPrice: bPrice,
+          valuation: val,
+          growth: parseFloat(growth.toFixed(2))
+        });
+      }
     }));
 
     const metrics = {
@@ -154,24 +176,20 @@ router.get('/dashboard', async (req, res) => {
         label: "Portfolio Net Worth",
         value: totalValue || 0,
         change: 0,
-        prefix: "$",
+        prefix: "₹",
       },
       activeDomains: {
         label: "Verified Assets",
         value: verifiedAssets.length,
         change: 0,
       },
-      monthlyRevenue: {
-        label: "Monthly Holding Cost",
-        value: totalHoldingCost || 0,
+      totalInvested: {
+        label: "Total Investment",
+        value: totalInvested || 0,
         change: 0,
-        prefix: "$",
+        prefix: "₹",
       },
-      watchlistSize: {
-        label: "Watchlist",
-        value: watchlistCount,
-        change: 0,
-      }
+      portfolio: portfolioData
     };
 
     return res.json(metrics);
@@ -202,20 +220,42 @@ router.post(
     body('domain').isString().trim().toLowerCase(),
     body('isForSale').optional().isBoolean(),
     body('askingPrice').optional().isNumeric(),
+    body('boughtPrice').isNumeric().withMessage('boughtPrice is required and must be a number'),
   ],
   async (req, res) => {
-    const { domain, isForSale, askingPrice } = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      logger.warn('POST /api/user/portfolio validation failed', { 
+        userId: req.user.id, 
+        errors: errors.array(),
+        body: req.body 
+      });
+      return res.status(422).json({ errors: errors.array() });
+    }
+
+    const { domain, isForSale, askingPrice, boughtPrice } = req.body;
     const token = crypto.randomBytes(16).toString('hex');
+    
+    // Auto-verify .test domains for development/testing
+    const isTestDomain = domain.endsWith('.test');
+    const status = isTestDomain ? 'verified' : 'unverified';
+    const lastVerifiedAt = isTestDomain ? new Date() : null;
 
     try {
       const result = await query(
-        `INSERT INTO portfolio (user_id, domain, is_for_sale, asking_price, verification_token) 
-         VALUES ($1, $2, $3, $4, $5) 
+        `INSERT INTO portfolio (user_id, domain, is_for_sale, asking_price, bought_price, verification_token, verification_status, last_verified_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
          RETURNING *`,
-        [req.user.id, domain, isForSale || false, askingPrice || null, token]
+        [req.user.id, domain, isForSale || false, askingPrice || null, boughtPrice, token, status, lastVerifiedAt]
       );
       return res.status(201).json(result.rows[0]);
     } catch (err) {
+      logger.error('POST /api/user/portfolio error', { 
+        userId: req.user.id, 
+        domain, 
+        message: err.message,
+        code: err.code 
+      });
       if (err.code === '23505') return res.status(409).json({ error: 'Domain already listed.' });
       return res.status(500).json({ error: 'Failed to add domain to portfolio.' });
     }
@@ -237,14 +277,10 @@ router.post('/portfolio/verify', async (req, res) => {
     const p = result.rows[0];
     let verification;
 
-    // Developer Bypass for .test domains
-    if (domain.endsWith('.test')) {
-      logger.info('Developer Bypass triggered for .test domain', { domain });
-      verification = { success: true };
-    } else if (method === 'dns') {
+    if (method === 'dns') {
       verification = await verifyDNS(domain, p.verification_token);
     } else {
-      verification = await verifyHTML(domain, p.verification_token);
+      return res.status(400).json({ error: 'Unsupported verification method.' });
     }
 
     if (verification.success) {

@@ -32,8 +32,8 @@ router.use(requireAdmin);
  */
 router.get('/stats', async (req, res) => {
   try {
-    const userCount = await query('SELECT COUNT(*) FROM users');
-    const sellerCount = await query("SELECT COUNT(*) FROM users WHERE kyc_status = 'verified'");
+    const userCount = await query('SELECT COUNT(*) FROM users WHERE is_admin = FALSE');
+    const sellerCount = await query("SELECT COUNT(*) FROM users WHERE kyc_status = 'verified' AND is_admin = FALSE");
     const inquiryCount = await query('SELECT COUNT(*) FROM inquiries');
     const domainCount = await query('SELECT COUNT(*) FROM portfolio');
 

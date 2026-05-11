@@ -34,10 +34,6 @@ class NexusScoreResponse(BaseModel):
         ..., ge=0, le=100,
         description="LLM-derived semantic quality, memorability, and brandability."
     )
-    trend_momentum: float = Field(
-        ..., ge=-100, le=100,
-        description="Google Trends momentum (-100 declining → +100 surging)."
-    )
     predicted_price: float = Field(
         default=0.0,
         description="Predicted aftermarket price from the price model."
