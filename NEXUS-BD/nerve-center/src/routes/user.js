@@ -303,4 +303,37 @@ router.post(
   }
 );
 
+// ─── DELETE /api/user/portfolio/:id ──────────────────────────────────────────
+router.delete('/portfolio/:id', async (req, res) => {
+  const portfolioId = req.params.id;
+
+  try {
+    const result = await query(
+      'DELETE FROM portfolio WHERE id = $1 AND user_id = $2 RETURNING *',
+      [portfolioId, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Portfolio record not found or you do not have permission to delete it.' 
+      });
+    }
+
+    logger.info('Portfolio record deleted', { userId: req.user.id, portfolioId });
+    
+    return res.json({ 
+      success: true, 
+      message: 'Domain removed from portfolio successfully.',
+      deletedRecord: result.rows[0]
+    });
+  } catch (err) {
+    logger.error('DELETE /portfolio error', { 
+      userId: req.user.id, 
+      portfolioId, 
+      message: err.message 
+    });
+    return res.status(500).json({ error: 'Failed to delete portfolio record.' });
+  }
+});
+
 module.exports = router;
