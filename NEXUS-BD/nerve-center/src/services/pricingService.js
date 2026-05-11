@@ -6,6 +6,8 @@
  * prices and estimates the resale value.
  */
 
+const USD_TO_INR = 83.5;
+
 /**
  * CALCULATE REGISTRAR PRICING
  * We compare different registrars (GoDaddy, Porkbun, etc.) to see who offers
@@ -61,12 +63,18 @@ function calculateAftermarketValue(domain, scores) {
   const sld = parts[0];
 
   const baseValues = {
-    'com': 800, 'ai': 1200, 'io': 600, 'net': 300, 'org': 400,
-    'xyz': 150, 'app': 250, 'dev': 300
+    'com': 800 * USD_TO_INR, 
+    'ai': 1200 * USD_TO_INR, 
+    'io': 600 * USD_TO_INR, 
+    'net': 300 * USD_TO_INR, 
+    'org': 400 * USD_TO_INR,
+    'xyz': 150 * USD_TO_INR, 
+    'app': 250 * USD_TO_INR, 
+    'dev': 300 * USD_TO_INR
   };
 
   const baseValue = baseValues[tld] || 100;
-  const overall = Math.round(scores.quantitative * 0.35 + scores.semantic * 0.4 + scores.trend * 0.25);
+  const overall = Math.round(scores.model * 0.45 + scores.semantic * 0.55);
   const lengthMultiplier = sld.length <= 3 ? 8 : sld.length <= 5 ? 3 : 1;
   const qualityMultiplier = Math.pow(overall / 55, overall > 80 ? 3 : 2.2);
 
@@ -75,12 +83,12 @@ function calculateAftermarketValue(domain, scores) {
 
   return {
     value: parseFloat(estimatedValue.toFixed(0)),
-    confidence: 0.7 + (overall / 100) * 0.2,
-    tier: estimatedValue > 10000 ? 'Premium' : estimatedValue > 5000 ? 'Investment' : 'Standard'
+    tier: estimatedValue > (10000 * USD_TO_INR) ? 'Premium' : estimatedValue > (5000 * USD_TO_INR) ? 'Investment' : 'Standard'
   };
 }
 
 module.exports = {
   calculateRegistrarPricing,
-  calculateAftermarketValue
+  calculateAftermarketValue,
+  USD_TO_INR
 };

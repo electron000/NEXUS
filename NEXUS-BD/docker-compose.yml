@@ -7,14 +7,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB:       nexus
-      POSTGRES_USER:     postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER:     ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,35 +22,40 @@ services:
   # ─── Node.js Nerve Center ───────────────────────────────────────────────────
   nerve-center:
     build:
-      context: ./services/nerve-center
-
+      context: ./nerve-center
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "3001:3001"
+      - "4000:4000"
     environment:
       NODE_ENV:              production
-      PORT:                  3001
+      PORT:                  4000
       DB_HOST:               postgres
       DB_PORT:               5432
       DB_NAME:               nexus
-      DB_USER:               postgres
-      DB_PASSWORD:           postgres
-      JWT_SECRET:            ${JWT_SECRET:-CHANGE_ME}
+      DB_USER:               ${DB_USER:-postgres}
+      DB_PASSWORD:           ${DB_PASSWORD:-postgres}
+      JWT_SECRET:            ${JWT_SECRET:-nexus_dev_secret_jwt_2024}
       JWT_EXPIRES_IN:        7d
       INTELLIGENCE_CORE_URL: http://intelligence-core:8000
-      INTERNAL_API_KEY:      ${INTERNAL_API_KEY:-CHANGE_ME}
-      NAMECHEAP_API_USER:    ${NAMECHEAP_API_USER:-}
-      NAMECHEAP_API_KEY:     ${NAMECHEAP_API_KEY:-}
-      NAMECHEAP_CLIENT_IP:   ${NAMECHEAP_CLIENT_IP:-}
-      GODADDY_API_KEY:       ${GODADDY_API_KEY:-}
-      GODADDY_API_SECRET:    ${GODADDY_API_SECRET:-}
+      INTERNAL_API_KEY:      ${INTERNAL_API_KEY:-nexus_test_secret_key_8000}
+      
+      # Registrar Keys (Synchronized with fixed names)
+      GODADDY_KEY:           ${GODADDY_KEY:-}
+      GODADDY_SECRET:        ${GODADDY_SECRET:-}
+      PORKBUN_KEY:           ${PORKBUN_KEY:-}
+      PORKBUN_SECRET:        ${PORKBUN_SECRET:-}
+      NAMECOM_USER:          ${NAMECOM_USER:-}
+      NAMECOM_TOKEN:         ${NAMECOM_TOKEN:-}
+      WHOISJSON_TOKEN:       ${WHOISJSON_TOKEN:-}
+      
+      PREFERRED_CURRENCY:    ${PREFERRED_CURRENCY:-INR}
       FRONTEND_ORIGIN:       ${FRONTEND_ORIGIN:-http://localhost:3000}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -58,20 +63,17 @@ services:
   # ─── FastAPI Intelligence Core ──────────────────────────────────────────────
   intelligence-core:
     build:
-      context: ./services/intelligence-core
-
+      context: ./intelligence-core
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
       PRODUCTION:          "true"
-      INTERNAL_API_KEY:    ${INTERNAL_API_KEY:-CHANGE_ME}
-      NERVE_CENTER_ORIGIN: http://nerve-center:3001
-      OPENAI_API_KEY:      ${OPENAI_API_KEY:-}
-      GEMINI_API_KEY:      ${GEMINI_API_KEY:-}
-      USE_PYTRENDS:        "true"
+      INTERNAL_API_KEY:    ${INTERNAL_API_KEY:-nexus_test_secret_key_8000}
+      NERVE_CENTER_ORIGIN: http://nerve-center:4000
       MODEL_PATH:          /app/models/
+      USE_PYTRENDS:        "true"
     volumes:
       - ml_models:/app/models
     healthcheck:
@@ -79,6 +81,21 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+  # ─── Next.js Frontend ───────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../NEXUS-FD
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      nerve-center:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      NODE_ENV:            production
 
 volumes:
   pgdata:

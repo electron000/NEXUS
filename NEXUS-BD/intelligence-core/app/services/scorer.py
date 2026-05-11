@@ -13,7 +13,6 @@ replaced by model_score, which is derived from the user-trained tier model
 from __future__ import annotations
 import asyncio
 
-from app.services.trends import get_trend_momentum
 from app.services.semantic import get_semantic_score
 from app.services.predictor import load_models, predict_valuation
 from app.utils.logger import logger
@@ -38,7 +37,6 @@ async def score_domain(domain: str) -> dict:
     {
       "modelScore":     float   – tier model output scaled 0–100
       "semanticScore":  float   – LLM semantic quality score 0–100
-      "trendMomentum":  float   – Google Trends momentum  -100 → +100
       "predictedPrice": float   – aftermarket price estimate
       "predictedTier":  str     – "low" | "medium" | "high"
     }
@@ -46,27 +44,19 @@ async def score_domain(domain: str) -> dict:
     loop = asyncio.get_event_loop()
 
     semantic_task = get_semantic_score(domain)
-    trend_task    = get_trend_momentum(domain)
 
-    semantic, trend = await asyncio.gather(
-        semantic_task,
-        trend_task,
-        return_exceptions=True,
-    )
-
-    def safe(val, default: float) -> float:
-        if isinstance(val, Exception):
-            logger.warning(f"Scoring component failed: {val}")
-            return default
-        return float(val)
+    try:
+        semantic = await semantic_task
+    except Exception as exc:
+        logger.warning(f"Semantic scoring failed: {exc}")
+        semantic = 50.0
 
     # Offload CPU-bound ML prediction to a thread pool
     predictions = await loop.run_in_executor(None, predict_valuation, domain)
 
     return {
         "modelScore":     predictions["model_score"],       
-        "semanticScore":  safe(semantic, 50.0),
-        "trendMomentum":  safe(trend, 0.0),
+        "semanticScore":  float(semantic),
         "predictedPrice": predictions["predicted_price"],
         "predictedTier":  predictions["predicted_tier"],
     }

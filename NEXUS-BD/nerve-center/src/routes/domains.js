@@ -8,7 +8,7 @@ const {
   calculateAftermarketValue 
 } = require('../services/pricingService');
 const { checkDomains } = require('../services/registrarService');
-const { getDomainOwnership } = require('../services/rdapService');
+const { getWhoisData } = require('../services/whoisService');
 const { getNexusScore } = require('../services/mlService');
 const logger = require('../config/logger');
 
@@ -27,7 +27,15 @@ router.get(
   authenticate,
   async (req, res) => {
     const { domain } = req.params;
-    
+    const parts = domain.split('.');
+    const tld = parts.length > 1 ? `.${parts.slice(1).join('.')}` : '';
+    const ALLOWED_TLDS = [
+      '.com', '.net', '.org', '.in', '.co.in', '.io', '.ai', '.co', '.dev', '.app', '.info', '.biz', '.tech', '.xyz', '.online', '.site',
+      '.shop', '.store', '.blog', '.life', '.world', '.global', '.cloud', '.digital', '.agency', '.solutions', '.network', '.software', '.media', '.services',
+      '.me', '.us', '.co.uk', '.ca', '.de', '.fr', '.jp', '.au', '.ru', '.ch', '.it', '.nl', '.se', '.no', '.es', '.br', '.mx', '.at', '.be', '.dk', '.fi', '.pt', '.pl', '.tr', '.kr', '.tw', '.hk', '.sg', '.my', '.th', '.id', '.ph', '.vn', '.ae', '.sa', '.qa', '.il',
+      '.top', '.test', 'icu', '.vip', '.club', '.win', '.bid', '.click', '.link', '.help', '.work', '.today', '.news', '.live', '.studio', '.design', '.expert', '.marketing', '.consulting', '.legal', '.finance', '.money', '.loan', '.credit', '.bank', '.insurance', '.events', '.party', '.wedding', '.family', '.yoga', '.fitness', '.health', '.clinic', '.doctor', '.hospital', '.vet', '.pet', '.dog', '.cat', '.farm', '.green', '.earth', '.garden', '.eco', '.bio', '.nature', '.space', '.science', '.education', '.academy', '.institute', '.center', '.gov', '.edu'
+    ];
+
     // Set up SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -42,6 +50,11 @@ router.get(
       logger.info('Valuation stream closed', { domain });
       res.end();
     };
+
+    if (parts.length < 2 || !ALLOWED_TLDS.includes(tld)) {
+      sendEvent('error', { message: `TLD '${tld}' is not currently supported for deep intelligence analysis.` });
+      return cleanup();
+    }
 
     req.on('close', cleanup);
 
@@ -84,14 +97,20 @@ router.get(
           lastUpdated: p.last_verified_at || p.created_at
         };
       } else {
-        const whoisData = await getDomainOwnership(domain);
-        if (whoisData.success && whoisData.registrant) {
+        const whoisData = await getWhoisData(domain);
+        if (whoisData.success) {
           ownership = {
             isNexusMember: false,
             isVerified: false,
-            ownerName: whoisData.registrant.name,
-            organization: whoisData.registrant.organization,
-            country: whoisData.registrant.country,
+            registered: whoisData.registered,
+            ownerName: whoisData.owner?.name,
+            ownerEmail: whoisData.owner?.email,
+            ownerPhone: whoisData.owner?.phone,
+            organization: whoisData.owner?.organization,
+            country: whoisData.owner?.country,
+            registrarName: whoisData.registrar?.name,
+            registrarEmail: whoisData.registrar?.email,
+            registrarPhone: whoisData.registrar?.phone,
             lastUpdated: whoisData.lastUpdated
           };
         }
@@ -104,7 +123,7 @@ router.get(
       sendEvent('progress', { stage: 'Synthesizing Intelligence...', pct: 85, message: 'Gathering registrar pricing...' });
       
       const userKeys = null;
-      const preferredCurrency = 'USD';
+      const preferredCurrency = 'INR';
       
       const liveData = await checkDomains([domain], userKeys);
 
@@ -129,12 +148,9 @@ router.get(
         tld,
         sld,
         score: {
-          overall: Math.round(nexusScore.quantitative * 0.35 + nexusScore.semantic * 0.4 + nexusScore.trend * 0.25),
-          quantitative: Math.round(nexusScore.quantitative),
+          overall: Math.round(nexusScore.model * 0.45 + nexusScore.semantic * 0.55),
+          model: Math.round(nexusScore.model),
           semantic: Math.round(nexusScore.semantic),
-          trend: Math.round(nexusScore.trend),
-          confidence: 0.85,
-          grade: calculateGrade(nexusScore),
           _source: nexusScore._source
         },
         pricing,
@@ -164,18 +180,8 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function calculateGrade(score) {
-  const overall = score.quantitative * 0.35 + score.semantic * 0.4 + score.trend * 0.25;
-  if (overall >= 90) return 'S';
-  if (overall >= 80) return 'A';
-  if (overall >= 70) return 'B';
-  if (overall >= 60) return 'C';
-  if (overall >= 50) return 'D';
-  return 'F';
-}
-
 function generateSummary(domain, score) {
-  const overall = score.quantitative * 0.35 + score.semantic * 0.4 + score.trend * 0.25;
+  const overall = score.model * 0.45 + score.semantic * 0.55;
   if (overall > 80) return `Institutional grade asset with high liquidity potential. Strong structural integrity for ${domain}.`;
   if (overall > 60) return `Standard utility asset. Suitable for brand development or medium-term investment.`;
   return `Speculative asset. High TCO relative to brand potential. Acquisition not recommended without strategic pivot.`;
@@ -185,7 +191,6 @@ function generateTags(domain, score, ownership) {
   const tags = [];
   if (domain.length < 10) tags.push('Short-Form');
   if (score.semantic > 75) tags.push('Brandable');
-  if (score.trend > 70) tags.push('Trending');
   if (ownership?.isNexusMember) tags.push('Nexus-Member-Owned');
   return tags;
 }
