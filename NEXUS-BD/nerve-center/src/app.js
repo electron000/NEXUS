@@ -14,6 +14,7 @@ const { pool } = require('./config/db');
 const logger = require('./config/logger');
 const path = require('path');
 const socketService = require('./services/socketService');
+const { generalLimiter } = require('./middleware/rateLimiter');
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -23,7 +24,7 @@ const watchlistRoutes = require('./routes/watchlist');
 const inquiryRoutes = require('./routes/inquiries');
 const adminRoutes = require('./routes/admin');
 
-const { loadCsvData } = require('./services/csvService');
+
 
 const app = express();
 const server = http.createServer(app);
@@ -43,9 +44,10 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
+app.use(generalLimiter);
 
 // Static Serving for Uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -101,7 +103,6 @@ app.use((err, _req, res, _next) => {
 server.listen(PORT, async () => {
   try {
     socketService.init(server);
-    await loadCsvData();
     logger.info(`Nexus Nerve Center running on port ${PORT} (WebSockets Enabled)`);
   } catch (err) {
     logger.error('Initialization error', { error: err.message });

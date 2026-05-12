@@ -20,14 +20,17 @@ function init(server) {
   // Authentication Middleware for Sockets
   io.use((socket, next) => {
     try {
-      // Sockets usually pass token in auth object
       const token = socket.handshake.auth.token || socket.handshake.headers.cookie?.split('token=')[1]?.split(';')[0];
-      if (!token) return next(new Error('Authentication error: No token provided'));
+      if (!token) {
+        logger.warn('Socket connection attempt without token', { socketId: socket.id });
+        return next(new Error('Authentication error: No token provided'));
+      }
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.user = decoded;
       next();
     } catch (err) {
+      logger.error('Socket authentication failed', { socketId: socket.id, error: err.message });
       next(new Error('Authentication error: Invalid token'));
     }
   });
@@ -50,7 +53,8 @@ function init(server) {
         
         if (result.rows.length > 0) {
           socket.join(`inquiry:${inquiryId}`);
-          logger.info(`User ${userId} joined inquiry room: ${inquiryId}`);
+          const roomSize = io.sockets.adapter.rooms.get(`inquiry:${inquiryId}`)?.size || 0;
+          logger.info(`User ${userId} joined inquiry room: ${inquiryId}`, { roomSize });
         }
       } catch (err) {
         logger.error('Socket join_inquiry error', { error: err.message });

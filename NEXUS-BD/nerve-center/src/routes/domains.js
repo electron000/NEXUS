@@ -164,8 +164,7 @@ router.get(
         score: {
           overall: Math.round(nexusScore.model * 0.45 + nexusScore.semantic * 0.55),
           model: Math.round(nexusScore.model),
-          semantic: Math.round(nexusScore.semantic),
-          _source: nexusScore._source
+          semantic: Math.round(nexusScore.semantic)
         },
         pricing,
         ownership,
