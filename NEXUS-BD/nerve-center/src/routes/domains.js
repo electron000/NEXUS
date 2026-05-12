@@ -83,7 +83,7 @@ router.get(
       
       let ownership = null;
       const portfolioRes = await query(
-        'SELECT p.*, u.email as owner_email, u.kyc_status FROM portfolio p JOIN users u ON p.user_id = u.id WHERE p.domain = $1',
+        'SELECT p.*, u.email as owner_email, u.name as owner_name, u.kyc_status FROM portfolio p JOIN users u ON p.user_id = u.id WHERE p.domain = $1',
         [domain]
       );
 
@@ -93,6 +93,7 @@ router.get(
           isNexusMember: true,
           isVerified: p.verification_status === 'verified',
           ownerEmail: p.owner_email,
+          ownerName: p.owner_name,
           isForSale: p.is_for_sale,
           askingPrice: p.asking_price,
           lastUpdated: p.last_verified_at || p.created_at
