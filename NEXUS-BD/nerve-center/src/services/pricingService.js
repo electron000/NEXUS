@@ -24,6 +24,8 @@ function calculateRegistrarPricing(domain, scores, liveData = {}, preferredCurre
     let registration = 0, renewal = 0, transfer = 0, privacy = 0, available = false;
     let currency = preferredCurrency;
 
+    let premium = false;
+
     const live = liveData[reg.slug];
     if (live) {
       registration = live.registration || 0;
@@ -31,6 +33,7 @@ function calculateRegistrarPricing(domain, scores, liveData = {}, preferredCurre
       transfer = live.transfer || 0;
       privacy = live.privacy || 0;
       available = live.available;
+      premium = live.premium || false;
       currency = live.currency || preferredCurrency;
     }
     
@@ -48,6 +51,7 @@ function calculateRegistrarPricing(domain, scores, liveData = {}, preferredCurre
       transfer: parseFloat(transfer.toFixed(2)),
       privacy: privacy === 0 ? 0 : parseFloat(privacy.toFixed(2)),
       available,
+      premium,
       currency,
       affiliateUrl: affiliateUrls[reg.slug] || `https://www.google.com/search?q=register+${domain}+${reg.name}`
     };

@@ -33,7 +33,7 @@ router.get(
       '.com', '.net', '.org', '.in', '.co.in', '.io', '.ai', '.co', '.dev', '.app', '.info', '.biz', '.tech', '.xyz', '.online', '.site',
       '.shop', '.store', '.blog', '.life', '.world', '.global', '.cloud', '.digital', '.agency', '.solutions', '.network', '.software', '.media', '.services',
       '.me', '.us', '.co.uk', '.ca', '.de', '.fr', '.jp', '.au', '.ru', '.ch', '.it', '.nl', '.se', '.no', '.es', '.br', '.mx', '.at', '.be', '.dk', '.fi', '.pt', '.pl', '.tr', '.kr', '.tw', '.hk', '.sg', '.my', '.th', '.id', '.ph', '.vn', '.ae', '.sa', '.qa', '.il',
-      '.top', '.test', '.ac.in', 'icu', '.vip', '.club', '.win', '.bid', '.click', '.link', '.help', '.work', '.today', '.news', '.live', '.studio', '.design', '.expert', '.marketing', '.consulting', '.legal', '.finance', '.money', '.loan', '.credit', '.bank', '.insurance', '.events', '.party', '.wedding', '.family', '.yoga', '.fitness', '.health', '.clinic', '.doctor', '.hospital', '.vet', '.pet', '.dog', '.cat', '.farm', '.green', '.earth', '.garden', '.eco', '.bio', '.nature', '.space', '.science', '.education', '.academy', '.institute', '.center', '.gov', '.edu'
+      '.top', '.test', '.inc', '.ac.in', 'icu', '.vip', '.club', '.win', '.bid', '.click', '.link', '.help', '.work', '.today', '.news', '.live', '.studio', '.design', '.expert', '.marketing', '.consulting', '.legal', '.finance', '.money', '.loan', '.credit', '.bank', '.insurance', '.events', '.party', '.wedding', '.family', '.yoga', '.fitness', '.health', '.clinic', '.doctor', '.hospital', '.vet', '.pet', '.dog', '.cat', '.farm', '.green', '.earth', '.garden', '.eco', '.bio', '.nature', '.space', '.science', '.education', '.academy', '.institute', '.center', '.gov', '.edu'
     ];
 
     // Set up SSE headers
