@@ -50,51 +50,51 @@ function formatPrice(val, currency = 'USD') {
 }
 
 // ─── Porkbun ─────────────────────────────────────────────────────────────────
+// Uses the v3 /domain/checkDomain endpoint (the old /domain/availability is deprecated and returns 404)
 async function checkPorkbun(domainList) {
   const apiKey    = MASTER_KEYS.porkbun.key;
   const apiSecret = MASTER_KEYS.porkbun.secret;
   if (!apiKey || !apiSecret) return {};
 
   const results = {};
-  try {
-    const pricingRes = await axios.post(`https://api.porkbun.com/api/json/v3/pricing/get`, {
-      apikey: apiKey, secretapikey: apiSecret
-    });
+  for (const domain of domainList) {
+    const d = domain.toLowerCase();
+    try {
+      const res = await axios.post(`https://api.porkbun.com/api/json/v3/domain/checkDomain/${d}`, {
+        apikey: apiKey, secretapikey: apiSecret
+      }, { timeout: 10000 });
 
-    if (pricingRes.data.status === 'SUCCESS') {
-      const pricing = pricingRes.data.pricing;
-      for (const domain of domainList) {
-        const d = domain.toLowerCase();
-        const tld = d.split('.').slice(1).join('.');
-        const tldData = pricing[tld];
-        
-        if (tldData) {
-          let isAvailable = false;
-          try {
-            const availRes = await axios.post(`https://api.porkbun.com/api/json/v3/domain/availability/${d}`, {
-              apikey: apiKey, secretapikey: apiSecret
-            });
-            isAvailable = availRes.data.status === 'SUCCESS' && availRes.data.available === 'yes';
-          } catch (e) { logger.warn(`Porkbun avail check failed: ${d}`); }
+      if (res.data.status === 'SUCCESS') {
+        const resp = res.data.response;
+        const isAvailable = resp.avail === 'yes';
+        const isPremium   = resp.premium === 'yes';
+        const regPrice    = parseFloat(resp.price || 0);
+        const renewPrice  = parseFloat(resp.additional?.renewal?.price || resp.price || 0);
+        const xferPrice   = parseFloat(resp.additional?.transfer?.price || resp.price || 0);
 
-          results[d] = {
-            available:    isAvailable,
-            registration: isAvailable ? formatPrice(tldData.registration) : 0,
-            renewal:      formatPrice(tldData.renewal),
-            transfer:     formatPrice(tldData.transfer),
-            privacy:      0, // Porkbun includes WHOIS privacy for free
-            currency:     PREFERRED_CURRENCY
-          };
-        }
+        results[d] = {
+          available:    isAvailable,
+          premium:      isPremium,
+          registration: isAvailable ? formatPrice(regPrice) : 0,
+          renewal:      formatPrice(renewPrice),
+          transfer:     formatPrice(xferPrice),
+          privacy:      0, // Porkbun includes WHOIS privacy for free
+          currency:     PREFERRED_CURRENCY
+        };
       }
+    } catch (err) {
+      logger.error(`Porkbun checkDomain failed: ${d}`, { error: err.message });
     }
-  } catch (err) {
-    logger.error('Porkbun lookup failed', { error: err.message });
   }
   return results;
 }
 
 // ─── GoDaddy ──────────────────────────────────────────────────────────────────
+// Set GODADDY_ENV=production for live keys; defaults to 'ote' for test/sandbox keys
+const GODADDY_BASE = (process.env.GODADDY_ENV || 'ote') === 'production'
+  ? 'https://api.godaddy.com'
+  : 'https://api.ote-godaddy.com';
+
 async function checkGoDaddy(domainList) {
   const apiKey    = MASTER_KEYS.godaddy.key;
   const apiSecret = MASTER_KEYS.godaddy.secret;
@@ -103,7 +103,7 @@ async function checkGoDaddy(domainList) {
   const results = {};
   for (const d of domainList) {
     try {
-      const res = await axios.get(`https://api.godaddy.com/v1/domains/available?domain=${d}`, {
+      const res = await axios.get(`${GODADDY_BASE}/v1/domains/available?domain=${d}`, {
         headers: { Authorization: `sso-key ${apiKey}:${apiSecret}` },
         timeout: 5000
       });
