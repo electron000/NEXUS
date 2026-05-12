@@ -11,10 +11,10 @@ BEGIN
         CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'failed');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'verification_method') THEN
-        CREATE TYPE verification_method AS ENUM ('dns', 'html');
+        CREATE TYPE verification_method AS ENUM ('dns');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'inquiry_status') THEN
-        CREATE TYPE inquiry_status AS ENUM ('open', 'negotiating', 'closed', 'spam');
+        CREATE TYPE inquiry_status AS ENUM ('open', 'closed');
     END IF;
 END $$;
 
@@ -138,6 +138,14 @@ CREATE TRIGGER update_watchlist_updated_at
     BEFORE UPDATE ON watchlist
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ── 8.1 Robustness Fixes ──────────────────────────────────────────────────────
+-- Ensure columns exist in case the database was initialized with an older schema
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_rejection_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_verified_at TIMESTAMPTZ;
+ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS bought_price NUMERIC(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS valuation_price NUMERIC(12, 2) DEFAULT 0;
+
 
 -- ── 9. Seed Data ──────────────────────────────────────────────────────────────
 -- Password: NexusAdmin2026!

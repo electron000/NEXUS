@@ -29,18 +29,26 @@ async function getWhoisData(domain) {
       success: true,
       registered: data.registered === true,
       domain: data.name,
+      created: data.created || null,
+      expires: data.expires || null,
+      status: Array.isArray(data.status) ? data.status : (data.status ? [data.status] : []),
+      nameservers: data.nameserver || [],
+      dnssec: data.dnssec || null,
       registrar: {
         name: registrar.name || null,
         email: registrar.email || null,
         phone: registrar.phone || null,
-        url: registrar.url || null
+        url: registrar.url || null,
+        abuseEmail: data.registrar?.abuseEmail || (data.contacts?.abuse?.[0]?.email) || null,
+        abusePhone: data.registrar?.abusePhone || (data.contacts?.abuse?.[0]?.phone) || null
       },
       owner: {
         name: owner ? owner.name : null,
         email: owner ? owner.email : null,
         phone: owner ? owner.phone : null,
         organization: owner ? owner.organization : null,
-        country: owner ? owner.country : null
+        country: owner ? owner.country : null,
+        address: owner ? owner.address : null
       },
       lastUpdated: data.lastUpdated || new Date().toISOString()
     };

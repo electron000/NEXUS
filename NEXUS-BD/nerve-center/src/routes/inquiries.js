@@ -194,6 +194,9 @@ router.post(
  */
 router.patch('/:id', async (req, res) => {
   const { status } = req.body;
+  if (!['open', 'closed'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Only open and closed are allowed.' });
+  }
   try {
     const result = await query(
       "UPDATE inquiries SET status = $1, updated_at = NOW() WHERE id = $2 AND (sender_id = $3 OR receiver_id = $3) RETURNING *",

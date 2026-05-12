@@ -10,6 +10,7 @@ const {
 const { checkDomains } = require('../services/registrarService');
 const { getWhoisData } = require('../services/whoisService');
 const { getNexusScore } = require('../services/mlService');
+const { getDnsIntelligence } = require('../services/dnsService');
 const logger = require('../config/logger');
 
 const router = express.Router();
@@ -33,7 +34,7 @@ router.get(
       '.com', '.net', '.org', '.in', '.co.in', '.io', '.ai', '.co', '.dev', '.app', '.info', '.biz', '.tech', '.xyz', '.online', '.site',
       '.shop', '.store', '.blog', '.life', '.world', '.global', '.cloud', '.digital', '.agency', '.solutions', '.network', '.software', '.media', '.services',
       '.me', '.us', '.co.uk', '.ca', '.de', '.fr', '.jp', '.au', '.ru', '.ch', '.it', '.nl', '.se', '.no', '.es', '.br', '.mx', '.at', '.be', '.dk', '.fi', '.pt', '.pl', '.tr', '.kr', '.tw', '.hk', '.sg', '.my', '.th', '.id', '.ph', '.vn', '.ae', '.sa', '.qa', '.il',
-      '.top', '.test', 'icu', '.vip', '.club', '.win', '.bid', '.click', '.link', '.help', '.work', '.today', '.news', '.live', '.studio', '.design', '.expert', '.marketing', '.consulting', '.legal', '.finance', '.money', '.loan', '.credit', '.bank', '.insurance', '.events', '.party', '.wedding', '.family', '.yoga', '.fitness', '.health', '.clinic', '.doctor', '.hospital', '.vet', '.pet', '.dog', '.cat', '.farm', '.green', '.earth', '.garden', '.eco', '.bio', '.nature', '.space', '.science', '.education', '.academy', '.institute', '.center', '.gov', '.edu'
+      '.top', '.test', '.ac.in', 'icu', '.vip', '.club', '.win', '.bid', '.click', '.link', '.help', '.work', '.today', '.news', '.live', '.studio', '.design', '.expert', '.marketing', '.consulting', '.legal', '.finance', '.money', '.loan', '.credit', '.bank', '.insurance', '.events', '.party', '.wedding', '.family', '.yoga', '.fitness', '.health', '.clinic', '.doctor', '.hospital', '.vet', '.pet', '.dog', '.cat', '.farm', '.green', '.earth', '.garden', '.eco', '.bio', '.nature', '.space', '.science', '.education', '.academy', '.institute', '.center', '.gov', '.edu'
     ];
 
     // Set up SSE headers
@@ -82,7 +83,7 @@ router.get(
       
       let ownership = null;
       const portfolioRes = await query(
-        'SELECT p.*, u.email as owner_email, u.kyc_status FROM portfolio p JOIN users u ON p.user_id = u.id WHERE p.domain = $1',
+        'SELECT p.*, u.email as owner_email, u.name as owner_name, u.kyc_status FROM portfolio p JOIN users u ON p.user_id = u.id WHERE p.domain = $1',
         [domain]
       );
 
@@ -92,12 +93,15 @@ router.get(
           isNexusMember: true,
           isVerified: p.verification_status === 'verified',
           ownerEmail: p.owner_email,
+          ownerName: p.owner_name,
           isForSale: p.is_for_sale,
           askingPrice: p.asking_price,
           lastUpdated: p.last_verified_at || p.created_at
         };
       } else {
         const whoisData = await getWhoisData(domain);
+        const dnsInt = await getDnsIntelligence(domain);
+
         if (whoisData.success) {
           ownership = {
             isNexusMember: false,
@@ -108,9 +112,19 @@ router.get(
             ownerPhone: whoisData.owner?.phone,
             organization: whoisData.owner?.organization,
             country: whoisData.owner?.country,
+            address: whoisData.owner?.address,
             registrarName: whoisData.registrar?.name,
             registrarEmail: whoisData.registrar?.email,
             registrarPhone: whoisData.registrar?.phone,
+            registrarUrl: whoisData.registrar?.url,
+            registrarAbuseEmail: whoisData.registrar?.abuseEmail,
+            registrarAbusePhone: whoisData.registrar?.abusePhone,
+            creationDate: whoisData.created,
+            expiryDate: whoisData.expires,
+            status: whoisData.status,
+            nameservers: whoisData.nameservers,
+            dnssec: whoisData.dnssec,
+            dnsIntelligence: dnsInt,
             lastUpdated: whoisData.lastUpdated
           };
         }

@@ -238,7 +238,7 @@ router.post(
     
     // Auto-verify .test domains for development/testing
     const isTestDomain = domain.endsWith('.test');
-    const status = isTestDomain ? 'verified' : 'unverified';
+    const status = isTestDomain ? 'verified' : 'pending';
     const lastVerifiedAt = isTestDomain ? new Date() : null;
 
     try {
@@ -264,7 +264,7 @@ router.post(
 
 // ─── POST /api/user/portfolio/verify ──────────────────────────────────────────
 router.post('/portfolio/verify', async (req, res) => {
-  const { domain, method } = req.body; // method: 'dns' | 'html'
+  const { domain } = req.body;
 
   try {
     const result = await query(
@@ -275,13 +275,8 @@ router.post('/portfolio/verify', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Domain not found in portfolio.' });
 
     const p = result.rows[0];
-    let verification;
+    const verification = await verifyDNS(domain, p.verification_token);
 
-    if (method === 'dns') {
-      verification = await verifyDNS(domain, p.verification_token);
-    } else {
-      return res.status(400).json({ error: 'Unsupported verification method.' });
-    }
 
     if (verification.success) {
       await query(
