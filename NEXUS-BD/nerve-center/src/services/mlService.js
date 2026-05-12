@@ -8,7 +8,7 @@
 
 const axios = require('axios');
 const logger = require('../config/logger');
-const { predictDomainMetrics } = require('./csvService');
+
 
 // The address where the Python Intelligence Core is listening
 const INTELLIGENCE_URL = process.env.INTELLIGENCE_CORE_URL || 'http://localhost:8000';
@@ -24,64 +24,28 @@ async function getNexusScore(domain) {
   try {
     /**
      * TRY THE INTELLIGENCE CORE
-     * We send the domain name to the Python server. It uses its custom
-     * XGBoost models to predict price, quality tier, and market momentum.
+     * We send the domain name to the Python server.
      */
     const response = await axios.post(`${INTELLIGENCE_URL}/api/ml/nexus-score`, 
       { domain },
       { 
         headers: { 'X-Internal-Key': INTERNAL_KEY },
-        timeout: 10000 
+        timeout: 15000 
       }
     );
 
     const data = response.data;
     
-    // We translate the Python data format into something the rest of our app understands
     return {
       model:        data.model_score,
       semantic:     data.semantic_score,
-      predictedPrice: data.predicted_price || (data.model_score * 50),
-      tier:         data.predicted_tier || (data.model_score >= 80 ? 'high' : data.model_score >= 50 ? 'medium' : 'low'),
-      _source: 'intelligence-core'
+      predictedPrice: data.predicted_price,
+      tier:         data.predicted_tier
     };
   } catch (err) {
-    /**
-     * FALLBACK 1: CSV HISTORICAL DATA
-     * If the Python server is down, we use our local CSV service. It looks at 
-     * 20 million historical data points to estimate a score.
-     */
-    logger.warn('Intelligence Core unreachable, falling back to local historical data', { domain, error: err.message });
-    try {
-      const metrics = await predictDomainMetrics(domain);
-      return { ...metrics, _source: 'csv-fallback' };
-    } catch (csvErr) {
-      /**
-       * FALLBACK 2: PROCEDURAL ESTIMATE
-       * If everything else fails (e.g., files are missing), we use a safe 
-       * procedural estimate so the user still gets a result.
-       */
-      logger.error('All ML scoring paths failed', { domain, message: csvErr.message });
-      return fallbackScore(domain);
-    }
+    logger.error('Intelligence Core failure', { domain, error: err.message });
+    throw new Error('Intelligence Core unreachable');
   }
-}
-
-/**
- * PROCEDURAL FALLBACK
- * A safety net function that generates a consistent (but basic) estimate 
- * based on the domain string itself.
- */
-function fallbackScore(domain) {
-  const seed = domain.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const norm = (n, lo, hi) => lo + (n % (hi - lo));
-  return {
-    model:        norm(seed,      40, 85),
-    semantic:     norm(seed * 3,  30, 90),
-    predictedPrice: norm(seed * 11, 10, 5000) * 83.5,
-    tier: 'low',
-    _source: 'procedural-fallback',
-  };
 }
 
 module.exports = { getNexusScore };

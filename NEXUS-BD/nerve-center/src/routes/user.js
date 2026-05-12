@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
   fileFilter: (req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png'];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -44,7 +44,7 @@ router.use(authenticate);
 router.get('/profile', async (req, res) => {
   try {
     const result = await query(
-      `SELECT email, created_at, preferences, kyc_status, first_name, middle_name, last_name 
+      `SELECT email, created_at, preferences, kyc_status, kyc_rejection_reason, first_name, middle_name, last_name 
        FROM users WHERE id = $1`,
       [req.user.id],
     );
@@ -63,6 +63,7 @@ router.get('/profile', async (req, res) => {
       createdAt:  row.created_at,
       preferences,
       kyc_status: row.kyc_status,
+      kyc_rejection_reason: row.kyc_rejection_reason,
       firstName:  row.first_name,
       middleName: row.middle_name,
       lastName:   row.last_name,
@@ -118,7 +119,14 @@ router.get('/dashboard', async (req, res) => {
     const { getNexusScore } = require('../services/mlService');
     const { calculateRegistrarPricing, USD_TO_INR } = require('../services/pricingService');
 
-    // 1. Get User Portfolio & Calculate Metrics
+    // 1. Get User KYC Status
+    const userResult = await query(
+      'SELECT kyc_status, kyc_rejection_reason FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    const user = userResult.rows[0];
+
+    // 2. Get User Portfolio & Calculate Metrics
     const portfolioResult = await query(
       'SELECT id, domain, verification_status, bought_price, valuation_price FROM portfolio WHERE user_id = $1',
       [req.user.id]
@@ -172,6 +180,8 @@ router.get('/dashboard', async (req, res) => {
     }));
 
     const metrics = {
+      kyc_status: user.kyc_status,
+      kyc_rejection_reason: user.kyc_rejection_reason,
       portfolioValue: {
         label: "Portfolio Net Worth",
         value: totalValue || 0,

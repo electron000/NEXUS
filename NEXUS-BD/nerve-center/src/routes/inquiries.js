@@ -165,20 +165,16 @@ router.post(
       };
 
       // 3. Broadcast to the other party
-      // We broadcast to the inquiry room AND specifically to the other user's private room 
-      // in case they are not in the chat UI but are logged in.
       const { getIO } = require('../services/socketService');
       const io = getIO();
       
+      logger.info('Broadcasting new message', { inquiryId, senderId: req.user.id });
+
       // Emit to inquiry-specific room
       io.to(`inquiry:${inquiryId}`).emit('new_message', message);
       
-      // Also emit a general notification to the other user
-      emitToUser(otherPartyId, 'chat_notification', {
-        inquiry_id: inquiryId,
-        domain: inquiry.domain,
-        message: content.substring(0, 50) + (content.length > 50 ? '...' : '')
-      });
+      // Direct delivery to the other party's private room to ensure real-time sync
+      emitToUser(otherPartyId, 'new_message', message);
 
       return res.status(201).json(message);
     } catch (err) {

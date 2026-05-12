@@ -8,6 +8,11 @@ Thumbs.db
 *.tmp
 *.bak
 *.swp
+temp/
+tmp/
+logs/
+uploads/
+**/uploads/
 
 # ─── Environment ──────────────────────────────────────────────────────────────
 .env
@@ -58,7 +63,11 @@ NEXUS-BD/nerve-center/error.log
 NEXUS-BD/nerve-center/test_*.js
 NEXUS-BD/nerve-center/save_*.js
 NEXUS-BD/nerve-center/revert_*.js
-NEXUS-BD/nerve-center/database.sqlite
+NEXUS-BD/nerve-center/*.sqlite
+NEXUS-BD/nerve-center/*.db
+combined.log
+error.log
+access.log
 
 # ─── Artifacts ──────────────────────────────────────────────────────────────
 .gemini/

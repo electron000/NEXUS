@@ -6,16 +6,11 @@ httpx==0.27.0
 python-dotenv==1.0.1
 
 # ML stack
-xgboost==2.0.3
 scikit-learn>=1.5.0
 numpy==1.26.4
 pandas==2.2.2
 
-# Trend data
-pytrends==4.9.2
-
 # LLM clients (semantic scoring)
-openai==1.35.3
 google-generativeai==0.7.1
 
 # Async & utilities
