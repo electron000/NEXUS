@@ -4,8 +4,7 @@ const express = require('express');
 const { query } = require('../config/db');
 const { authenticate } = require('../middleware/auth');
 const { 
-  calculateRegistrarPricing, 
-  calculateAftermarketValue 
+  calculateRegistrarPricing
 } = require('../services/pricingService');
 const { checkDomains } = require('../services/registrarService');
 const { getWhoisData } = require('../services/whoisService');
@@ -100,7 +99,7 @@ router.get(
         };
       } else {
         const whoisData = await getWhoisData(domain);
-        const dnsInt = await getDnsIntelligence(domain);
+        // const dnsInt = await getDnsIntelligence(domain);
 
         if (whoisData.success) {
           ownership = {
@@ -124,7 +123,7 @@ router.get(
             status: whoisData.status,
             nameservers: whoisData.nameservers,
             dnssec: whoisData.dnssec,
-            dnsIntelligence: dnsInt,
+            // dnsIntelligence: dnsInt,
             lastUpdated: whoisData.lastUpdated
           };
         }
@@ -142,9 +141,8 @@ router.get(
       const liveData = await checkDomains([domain], userKeys);
 
       const pricing = calculateRegistrarPricing(domain, nexusScore, liveData, preferredCurrency);
-      const appraisal = calculateAftermarketValue(domain, nexusScore);
       
-      // Injecting high-fidelity ML predictions
+      const appraisal = {};
       appraisal.predictedPrice = nexusScore.predictedPrice;
       appraisal.predictedTier = nexusScore.tier;
 
@@ -154,15 +152,11 @@ router.get(
       const sld = parts[0];
       const tld = parts.slice(1).join('.');
 
-      /**
-       * FINAL ASSEMBLY
-       */
       const response = {
         domain,
         tld,
         sld,
         score: {
-          overall: Math.round(nexusScore.model * 0.45 + nexusScore.semantic * 0.55),
           model: Math.round(nexusScore.model),
           semantic: Math.round(nexusScore.semantic)
         },

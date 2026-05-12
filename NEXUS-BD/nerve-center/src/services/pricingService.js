@@ -54,41 +54,7 @@ function calculateRegistrarPricing(domain, scores, liveData = {}, preferredCurre
   });
 }
 
-/**
- * THE APPRAISAL ENGINE (Fair Market Value)
- */
-function calculateAftermarketValue(domain, scores) {
-  const parts = domain.split('.');
-  const tld = parts.slice(1).join('.');
-  const sld = parts[0];
-
-  const baseValues = {
-    'com': 800 * USD_TO_INR, 
-    'ai': 1200 * USD_TO_INR, 
-    'io': 600 * USD_TO_INR, 
-    'net': 300 * USD_TO_INR, 
-    'org': 400 * USD_TO_INR,
-    'xyz': 150 * USD_TO_INR, 
-    'app': 250 * USD_TO_INR, 
-    'dev': 300 * USD_TO_INR
-  };
-
-  const baseValue = baseValues[tld] || 100;
-  const overall = Math.round(scores.model * 0.45 + scores.semantic * 0.55);
-  const lengthMultiplier = sld.length <= 3 ? 8 : sld.length <= 5 ? 3 : 1;
-  const qualityMultiplier = Math.pow(overall / 55, overall > 80 ? 3 : 2.2);
-
-  let estimatedValue = baseValue * lengthMultiplier * qualityMultiplier;
-  if (scores.semantic > 80) estimatedValue *= 1.5;
-
-  return {
-    value: parseFloat(estimatedValue.toFixed(0)),
-    tier: estimatedValue > (10000 * USD_TO_INR) ? 'Premium' : estimatedValue > (5000 * USD_TO_INR) ? 'Investment' : 'Standard'
-  };
-}
-
 module.exports = {
   calculateRegistrarPricing,
-  calculateAftermarketValue,
   USD_TO_INR
 };
