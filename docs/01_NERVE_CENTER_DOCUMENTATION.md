@@ -382,7 +382,7 @@ All auth routes use the `authLimiter` (100 req / 15 min per IP).
 {
   "email": "user@example.com",
   "password": "StrongP4ss",
-  "name": "John Doe"
+  "name": "Arun Jyoti"
 }
 ```
 

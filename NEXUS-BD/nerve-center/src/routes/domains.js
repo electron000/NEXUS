@@ -99,8 +99,7 @@ router.get(
         };
       } else {
         const whoisData = await getWhoisData(domain);
-        // const dnsInt = await getDnsIntelligence(domain);
-
+        
         if (whoisData.success) {
           ownership = {
             isNexusMember: false,
@@ -123,7 +122,6 @@ router.get(
             status: whoisData.status,
             nameservers: whoisData.nameservers,
             dnssec: whoisData.dnssec,
-            // dnsIntelligence: dnsInt,
             lastUpdated: whoisData.lastUpdated
           };
         }
@@ -163,8 +161,6 @@ router.get(
         pricing,
         ownership,
         appraisal,
-        summary: generateSummary(domain, nexusScore),
-        tags: generateTags(domain, nexusScore, ownership),
         timestamp: new Date().toISOString(),
       };
 
@@ -185,21 +181,6 @@ router.get(
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function generateSummary(domain, score) {
-  const overall = score.model * 0.45 + score.semantic * 0.55;
-  if (overall > 80) return `Institutional grade asset with high liquidity potential. Strong structural integrity for ${domain}.`;
-  if (overall > 60) return `Standard utility asset. Suitable for brand development or medium-term investment.`;
-  return `Speculative asset. High TCO relative to brand potential. Acquisition not recommended without strategic pivot.`;
-}
-
-function generateTags(domain, score, ownership) {
-  const tags = [];
-  if (domain.length < 10) tags.push('Short-Form');
-  if (score.semantic > 75) tags.push('Brandable');
-  if (ownership?.isNexusMember) tags.push('Nexus-Member-Owned');
-  return tags;
 }
 
 module.exports = router;
