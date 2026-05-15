@@ -50,6 +50,7 @@ env/
 htmlcov/
 .mypy_cache/
 .ipynb_checkpoints/
+test.ipynb
 
 # ─── IDE ──────────────────────────────────────────────────────────────────────
 .vscode/

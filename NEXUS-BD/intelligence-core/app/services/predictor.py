@@ -1,4 +1,4 @@
-import os
+import os,requests
 import pickle
 from pathlib import Path
 import numpy as np
@@ -6,6 +6,7 @@ import pandas as pd
 from app.config import settings
 from app.services.features import extract
 from app.utils.logger import logger
+from datetime import date
 
 _price_model = None
 _tier_model = None
@@ -39,6 +40,23 @@ def predict_valuation(domain: str) -> dict:
     Predict price, tier, and model_score using the provided models.
     """
     feats = extract(domain)
+
+    # domain age calculation----
+    r=requests.get(f"https://www.whoisxmlapi.com/whoisserver/WhoisService?apiKey=at_Rlw9O7ALheDyLV3TOtbQtVRbk34h1&domainName={domain}",params={"outputFormat": "JSON"})
+    raw_data=r.json()["WhoisRecord"]
+    data =raw_data.get("createdDate")
+    if data == None:
+        age=1
+    else:
+        date_ = data.split('T')[0]
+        reg = tuple(int(x) for x in date_.split('-'))
+        reg_date=date(*reg)
+
+        current=date.today()
+
+        diff_age= current - reg_date
+
+        age=diff_age.days/365
 
     # CRITICAL: This exact order must match the array columns used during model.fit()
     input_df = pd.DataFrame([{
@@ -88,7 +106,8 @@ def predict_valuation(domain: str) -> dict:
     if _price_model:
         try:
             price_input_df = input_df.copy()
-            price_input_df["tier"] = tier_val 
+            price_input_df["tier"] = tier_val
+            price_input_df["age_years"] =age
             
             # Reinstated .values here as well
             price = float(_price_model.predict(price_input_df.values)[0])
