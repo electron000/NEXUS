@@ -42,7 +42,8 @@ def predict_valuation(domain: str) -> dict:
     feats = extract(domain)
 
     # domain age calculation----
-    r=requests.get(f"https://www.whoisxmlapi.com/whoisserver/WhoisService?apiKey=at_Rlw9O7ALheDyLV3TOtbQtVRbk34h1&domainName={domain}",params={"outputFormat": "JSON"})
+    whois_api_key = getattr(settings, 'whoisxml_api_key', 'at_Rlw9O7ALheDyLV3TOtbQtVRbk34h1')
+    r=requests.get(f"https://www.whoisxmlapi.com/whoisserver/WhoisService?apiKey={whois_api_key}&domainName={domain}",params={"outputFormat": "JSON"})
     raw_data=r.json()["WhoisRecord"]
     data =raw_data.get("createdDate")
     if data == None:

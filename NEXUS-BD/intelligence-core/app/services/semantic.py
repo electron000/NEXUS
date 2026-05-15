@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import re
+import requests
 from cachetools import TTLCache
 
 from app.config import settings
@@ -119,10 +120,10 @@ def _heuristic_fallback(domain: str) -> float:
     """
     from app.services.features import extract
     feats = extract(domain)
+    # Corrected features to match what 'extract' actually returns
     score = (
-        feats["length_score"]   * 40
-        + feats["alt_score"]    * 30
-        + feats["uniqueness"]   * 20
-        + feats["tld_score"]    * 10
+        (100 - feats["length"] * 5) * 0.40  # Penalty for length
+        + feats["brand_score"]  * 30 * 100  # Weighted brandability
+        + feats["tld_score"]    * 30 * 100  # Weighted TLD premium
     )
-    return round(min(100.0, score), 2)
+    return round(max(0.0, min(100.0, score)), 2)

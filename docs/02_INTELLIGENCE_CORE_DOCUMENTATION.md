@@ -62,9 +62,9 @@ The Intelligence Core is a **dedicated ML microservice** that operates as an int
 
 | Responsibility | Description |
 |---|---|
-| **Feature Engineering** | Extract 12+ numerical features from raw domain strings |
-| **Tier Prediction** | Classify domains as `low`, `medium`, or `high` investment tiers |
-| **Price Prediction** | Estimate aftermarket price using trained RandomForest regression model |
+| **Feature Engineering** | Extract 6-8 numerical features from raw domain strings |
+| **Tier Prediction** | Classify domains as `low`, `medium`, or `high` using 6 structural features |
+| **Price Prediction** | Estimate price using 8 features (structural + tier + age) |
 | **Semantic Scoring** | LLM-powered analysis of brandability, memorability, and semantic clarity |
 | **Score Composition** | Combine model + semantic scores into a unified Nexus Score |
 
@@ -163,6 +163,7 @@ Configuration is centralized in `app/config.py` using Pydantic's `BaseSettings` 
 | `NERVE_CENTER_ORIGIN` | str | `http://localhost:4000` | Allowed CORS origin |
 | `GEMINI_API_KEY` | str | `""` | Google Gemini API key (recommended) |
 | `GEMINI_MODEL_NAME` | str | `gemini-2.5-flash` | Target Gemini model for semantic scoring |
+| `WHOISXML_API_KEY` | str | — | API key for domain age lookups |
 | `MODEL_PATH` | str | `models/` | Directory containing .pkl model files |
 
 ### Protected Namespace Handling
@@ -328,6 +329,7 @@ The scorer runs the **semantic scoring** (async I/O-bound LLM call) and **ML pre
 | 4 | `tld_score` | float | 0–1 | TLD premium score from lookup table |
 | 5 | `keyword_score` | float | 0–1 | Heuristic penalizing hyphens, digits, and lack of vowels |
 | 6 | `brand_score` | float | 0–1 | Vowel-consonant alternation ratio |
+| 7 | `age_years` | float | ≥ 0 | Domain age in years (used in Price Model only) |
 
 ### TLD Premium Table
 
@@ -425,11 +427,12 @@ input → tier_model.predict(input_df.values) → raw_prediction
 
 ### Price Model Prediction
 
-The price model receives the **same 6 features plus the tier value** as a 7th feature:
+The price model receives the **6 base features plus the tier value and domain age** as inputs (8 total features):
 
 ```python
 price_input_df = input_df.copy()
-price_input_df["tier"] = tier_val    # 7th column
+price_input_df["tier"] = tier_val       # 7th feature
+price_input_df["age_years"] = age      # 8th feature
 price = price_model.predict(price_input_df.values)[0]
 ```
 

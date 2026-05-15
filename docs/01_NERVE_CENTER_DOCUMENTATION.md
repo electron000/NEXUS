@@ -280,6 +280,7 @@ Chat messages within inquiry threads.
 | `inquiry_id` | UUID (FK → inquiries) | Parent inquiry |
 | `sender_id` | UUID (FK → users) | Message author |
 | `content` | TEXT | Message body |
+| `is_read` | BOOLEAN | DEFAULT `FALSE` |
 | `created_at` | TIMESTAMPTZ | Send time |
 
 #### Triggers
@@ -461,8 +462,10 @@ All routes require authentication.
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | `POST` | `/` | ✅ | Create new inquiry (buyer → seller) |
-| `GET` | `/` | ✅ | List all user's inquiries |
-| `GET` | `/:id/messages` | ✅ | Get chat history for an inquiry |
+| `GET` | `/` | ✅ | List inquiries (includes `unread_count`) |
+| `GET` | `/unread-count` | ✅ | Get total unread messages count |
+| `GET` | `/:id/messages` | ✅ | Get chat history (marks messages as read) |
+| `PATCH` | `/:id/read` | ✅ | Mark inquiry messages as read |
 | `POST` | `/:id/messages` | ✅ | Send message in inquiry thread |
 | `PATCH` | `/:id` | ✅ | Update inquiry status (open/closed) |
 

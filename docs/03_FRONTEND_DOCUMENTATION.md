@@ -235,7 +235,7 @@ Persisted to `localStorage` under key `nexus-terminal-store`.
 | **Session** | `isLoggedIn`, `userProfile`, `_hasHydrated` | Auth state + hydration tracking |
 | **Watchlist** | `watchlist: WatchlistEntry[]` | Client-side domain tracking |
 | **Terminal** | `lastQuery`, `lastValuation`, `queryHistory` | Search history (last 20) |
-| **UI** | `sidebarCollapsed`, `commandPaletteOpen` | Layout preferences |
+| **UI** | `sidebarCollapsed`, `commandPaletteOpen`, `unreadMessagesCount` | Layout preferences + notification count |
 
 #### Persisted Fields
 
@@ -251,6 +251,7 @@ Only these fields survive page reload:
 | `logout()` | Clears all session and cached data |
 | `updateProfile(updates)` | Partial profile update + localStorage sync |
 | `setLastValuation(domain, data)` | Stores valuation result + adds to history |
+| `fetchUnreadMessagesCount()` | Fetches total unread messages from backend |
 | `toggleSidebar()` | Collapse/expand sidebar |
 
 #### Hydration Tracking
@@ -402,6 +403,7 @@ const socket = io(API_BASE_URL, {
 1. **Connect**: On successful `GET /api/auth/me` in dashboard layout
 2. **Disconnect**: On logout (explicit `disconnectSocket()`)
 3. **Events**: `new_inquiry`, `new_message`, `inquiry_updated`, `status_updated`
+4. **Unread Count Sync**: Automatically triggers `fetchUnreadMessagesCount()` on `new_message` or `new_inquiry` events to update UI badges.
 
 ---
 

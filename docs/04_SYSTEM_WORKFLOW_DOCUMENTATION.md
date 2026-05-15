@@ -439,6 +439,23 @@ Messages are delivered through TWO channels simultaneously:
 1. **Room broadcast**: `io.to(inquiry:{id}).emit('new_message')` — reaches all participants in the chat view
 2. **Direct delivery**: `emitToUser(otherId, 'new_message')` — ensures delivery even if user hasn't joined the room yet
 
+### Unread Message Notification System
+
+NEXUS tracks message read-status across the entire system to ensure users never miss an inquiry.
+
+**1. Status Tracking (Backend)**
+- Every message in the `messages` table has an `is_read` boolean (default `FALSE`).
+- The `GET /api/inquiries` endpoint returns an `unread_count` for each conversation.
+- The `GET /api/inquiries/unread-count` endpoint returns a global total of unread messages.
+
+**2. Real-Time Synchronization**
+- When a `new_message` or `new_inquiry` socket event is received, the frontend automatically calls `fetchUnreadMessagesCount()` to refresh global state.
+- Red notification badges appear in the **Sidebar**, **Mobile Bottom Nav**, and **Mobile Drawer**.
+
+**3. Automatic Read-Marking**
+- Opening a chat thread (`GET /api/inquiries/:id/messages`) automatically marks all received messages as `is_read = TRUE` for that inquiry.
+- If a chat is already open, incoming socket messages are marked as read via a `PATCH /api/inquiries/:id/read` call, keeping the global unread count in sync instantly.
+
 ---
 
 ## 8. Admin Dashboard
