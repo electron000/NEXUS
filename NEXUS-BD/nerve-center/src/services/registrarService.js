@@ -36,7 +36,7 @@ const MASTER_KEYS = {
 };
 
 const PREFERRED_CURRENCY = process.env.PREFERRED_CURRENCY || 'USD';
-const USD_TO_INR = 83.50; // Dynamic fallback if no live feed
+const USD_TO_INR = 95.93; // Dynamic fallback if no live feed
 
 /**
  * Converts price based on preferred currency
@@ -83,7 +83,8 @@ async function checkPorkbun(domainList) {
         };
       }
     } catch (err) {
-      logger.error(`Porkbun checkDomain failed: ${d}`, { error: err.message });
+      // Downgrade to debug to avoid noise on unsupported TLDs like .ac.in
+      logger.debug(`Porkbun checkDomain failed: ${d}`, { error: err.message });
     }
   }
   return results;

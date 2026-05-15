@@ -9,7 +9,6 @@ const {
 const { checkDomains } = require('../services/registrarService');
 const { getWhoisData } = require('../services/whoisService');
 const { getNexusScore } = require('../services/mlService');
-const { getDnsIntelligence } = require('../services/dnsService');
 const logger = require('../config/logger');
 
 const router = express.Router();

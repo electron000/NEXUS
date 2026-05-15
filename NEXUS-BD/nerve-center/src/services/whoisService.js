@@ -16,7 +16,7 @@ async function getWhoisData(domain) {
   try {
     const response = await axios.get(`https://whoisjson.com/api/v1/whois/?domain=${domain.toLowerCase()}`, {
       headers: { 'Authorization': `TOKEN=${token}` },
-      timeout: 10000
+      timeout: 30000
     });
 
     const data = response.data;

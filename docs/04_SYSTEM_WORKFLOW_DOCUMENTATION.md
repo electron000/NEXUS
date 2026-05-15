@@ -227,7 +227,7 @@ Where:
 ### Aftermarket Value Algorithm
 
 ```
-base_value = TLD_BASE[tld] × 83.5 (USD→INR)
+base_value = TLD_BASE[tld] × 95.93 (USD→INR)
 length_mult = (≤3: 8×) | (≤5: 3×) | (else: 1×)
 quality_mult = (overall/55) ^ (overall>80 ? 3 : 2.2)
 value = base_value × length_mult × quality_mult × (semantic>80 ? 1.5 : 1)
@@ -621,3 +621,14 @@ Intelligence Core: CORS restricted to Nerve Center origin only
 | Watchlist | Watchlist page | Watchlist routes | — |
 | Admin Stats | Admin dashboard | Admin routes (SQL counts) | — |
 | Aftermarket Valuation | Appraisal display | pricingService algorithm | Price model prediction |
+
+---
+
+## 15. Educational References
+
+Here are resources to understand the architectural patterns used in this system workflow:
+
+- **Microservices Architecture**: [Microservices Guide by Martin Fowler](https://martinfowler.com/articles/microservices.html)
+- **Server-Sent Events (SSE)**: [Using server-sent events - MDN](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+- **Cross-Origin Resource Sharing (CORS)**: [CORS documentation on MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+- **WebSockets**: [The WebSocket API - MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)

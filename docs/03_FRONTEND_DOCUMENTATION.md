@@ -437,21 +437,18 @@ const socket = io(API_BASE_URL, {
 
 ## 13. Deployment
 
-### Docker (Multi-Stage)
+### Windows Local Setup (PowerShell)
 
-```dockerfile
-# Build stage
-FROM node:20-alpine AS builder
-COPY . .
-RUN npm ci && npm run build
+```powershell
+# 1. Install dependencies
+npm install
 
-# Runner stage
-FROM node:20-alpine AS runner
-ENV NODE_ENV=production
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-CMD ["npm", "start"]
-EXPOSE 3000
+# 2. Configure Environment variables
+Copy-Item .env.example .env
+# (Edit .env with your backend API URLs)
+
+# 3. Start the development server
+npm run dev
 ```
 
 ### NPM Scripts
@@ -462,3 +459,16 @@ EXPOSE 3000
 | `npm run build` | Production build |
 | `npm start` | Production server |
 | `npm run lint` | ESLint check |
+
+---
+
+## 14. Educational References
+
+Here are resources to learn the core technologies used in the Frontend:
+
+- **Next.js**: [Next.js App Router Documentation](https://nextjs.org/docs/app)
+- **Zustand**: [Zustand Documentation](https://docs.pmnd.rs/zustand/getting-started/introduction)
+- **TailwindCSS**: [TailwindCSS Documentation](https://tailwindcss.com/docs)
+- **shadcn/ui**: [shadcn/ui Documentation](https://ui.shadcn.com/docs)
+- **React Hook Form**: [React Hook Form Documentation](https://react-hook-form.com/get-started)
+- **Zod**: [Zod Documentation](https://zod.dev/)

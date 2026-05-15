@@ -1,5 +1,4 @@
 from __future__ import annotations
-import re
 from typing import Dict
 
 # TLD tier premiums (higher = more desirable)
@@ -10,12 +9,12 @@ TLD_PREMIUM: Dict[str, float] = {
 }
 
 VOWELS = set("aeiou")
-CONSONANTS = set("bcdfghjklmnpqrstvwxyz")
 
 
 def extract(domain: str) -> dict:
     """
-    Return a flat feature dict for a single domain string.
+    Return a flat feature dict for a single domain string matching exactly
+    the 6 features used during model training.
     """
     domain = domain.strip().lower()
 
@@ -27,39 +26,23 @@ def extract(domain: str) -> dict:
         sld, tld = domain, ".com"
 
     length = len(sld)
-    char_set = set(sld)
+    vowel_count = sum(1 for c in sld if c in VOWELS)
+    has_number = any(c.isdigit() for c in sld)
 
-    vowel_count     = sum(1 for c in sld if c in VOWELS)
-    consonant_count = sum(1 for c in sld if c in CONSONANTS)
-    digit_count     = sum(1 for c in sld if c.isdigit())
-    hyphen_count    = sld.count("-")
-
-    vowel_ratio     = vowel_count / max(length, 1)
-    digit_ratio     = digit_count / max(length, 1)
-
-    alt_score = _alternating_score(sld)
-    uniqueness = len(char_set) / max(length, 1)
+    vowel_ratio = vowel_count / max(length, 1)
+    brand_score = _alternating_score(sld)
     tld_score = TLD_PREMIUM.get(tld, 0.15)
     
     # Continuous Keyword Score
     keyword_score = _calculate_keyword_score(sld)
 
-    max_repeat = _max_consecutive_repeat(sld)
-    length_score = _length_score(length)
-
     return {
-        "tld":             tld,            # Preserved raw string for model parity
         "length":          float(length),
         "vowel_ratio":     vowel_ratio,
-        "digit_ratio":     digit_ratio,
-        "hyphen_count":    float(hyphen_count),
-        "uniqueness":      uniqueness,
-        "alt_score":       alt_score,
+        "has_number":      float(has_number),
         "tld_score":       tld_score,
         "keyword_score":   keyword_score,  
-        "max_repeat":      float(max_repeat),
-        "length_score":    length_score,
-        "consonant_ratio": consonant_count / max(length, 1),
+        "brand_score":     brand_score,
     }
 
 
@@ -76,7 +59,7 @@ def _calculate_keyword_score(sld: str) -> float:
     length = len(sld)
     has_hyphen = "-" in sld
     has_digit = any(c.isdigit() for c in sld)
-    vowel_count = sum(1 for c in sld if c in set("aeiou"))
+    vowel_count = sum(1 for c in sld if c in VOWELS)
     
     # 1. Severe penalty for gibberish (long domains with no vowels)
     if length > 7 and vowel_count == 0:
@@ -102,25 +85,3 @@ def _alternating_score(s: str) -> float:
         if (s[i] in VOWELS) != (s[i + 1] in VOWELS):
             alternations += 1
     return alternations / (len(s) - 1)
-
-
-def _max_consecutive_repeat(s: str) -> int:
-    if not s: return 0
-    max_run = current_run = 1
-    for i in range(1, len(s)):
-        if s[i] == s[i - 1]:
-            current_run += 1
-            max_run = max(max_run, current_run)
-        else:
-            current_run = 1
-    return max_run
-
-
-def _length_score(n: int) -> float:
-    if n < 3: return 0.40
-    if n == 3: return 0.70
-    if n <= 5: return 1.00
-    if n <= 8: return 0.90
-    if n <= 12: return 0.70
-    if n <= 16: return 0.50
-    return 0.30
