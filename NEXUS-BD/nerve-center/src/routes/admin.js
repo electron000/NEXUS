@@ -115,4 +115,45 @@ router.post('/kyc/review', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/users
+ * List all platform users (excluding admins).
+ */
+router.get('/users', async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT id, email, name, role, is_admin, kyc_status, created_at 
+       FROM users 
+       WHERE is_admin = FALSE 
+       ORDER BY created_at DESC`
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    logger.error('Admin fetch users error', { message: err.message });
+    return res.status(500).json({ error: 'Failed to retrieve users.' });
+  }
+});
+
+/**
+ * DELETE /api/admin/users/:userId
+ * Permanently remove a user from the platform.
+ */
+router.delete('/users/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    // Check if the user is an admin before deleting
+    const checkAdmin = await query('SELECT is_admin FROM users WHERE id = $1', [userId]);
+    if (checkAdmin.rows.length > 0 && checkAdmin.rows[0].is_admin) {
+      return res.status(403).json({ error: 'Cannot delete an administrator account.' });
+    }
+
+    await query('DELETE FROM users WHERE id = $1', [userId]);
+    logger.info(`User ${userId} deleted by admin ${req.user.id}`);
+    return res.json({ success: true, message: 'User deleted successfully.' });
+  } catch (err) {
+    logger.error('Admin delete user error', { message: err.message });
+    return res.status(500).json({ error: 'Failed to delete user.' });
+  }
+});
+
 module.exports = router;

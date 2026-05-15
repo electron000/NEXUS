@@ -99,8 +99,8 @@ CREATE INDEX IF NOT EXISTS idx_portfolio_domain ON portfolio(domain);
 CREATE TABLE IF NOT EXISTS inquiries (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     domain        TEXT NOT NULL,
-    sender_id     UUID NOT NULL REFERENCES users(id),
-    receiver_id   UUID NOT NULL REFERENCES users(id),
+    sender_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    receiver_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     message       TEXT NOT NULL,
     offer_price   NUMERIC(12, 2),
     status        inquiry_status DEFAULT 'open',
@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS messages (
     inquiry_id  UUID NOT NULL REFERENCES inquiries(id) ON DELETE CASCADE,
     sender_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     content     TEXT NOT NULL,
+    is_read     BOOLEAN DEFAULT FALSE,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
