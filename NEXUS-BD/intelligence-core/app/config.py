@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     nerve_center_origin: str = "http://localhost:4000"
 
     # LLM providers
-    gemini_api_key: str = "AIzaSyDVvFQiyTUVIbzUhijUFNvhKQLyjJro17A"
+    gemini_api_key: str = ""
     # Explicitly declared so it can be targeted by .env overrides
     gemini_model_name: str = "gemini-2.5-flash"
 
