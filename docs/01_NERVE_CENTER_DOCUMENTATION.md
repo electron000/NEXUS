@@ -47,12 +47,12 @@ The Nerve Center is the **central nervous system** of NEXUS. It acts as the sing
 | Responsibility | Description |
 |---|---|
 | **Authentication** | JWT-based stateless auth with HttpOnly cookies, OTP email verification |
-| **Domain Intelligence** | Orchestrates multi-source data aggregation (registrar APIs, WHOIS, RDAP, DNS, ML) |
+| **Domain Intelligence** | Orchestrates multi-source data aggregation (registrar APIs, WHOIS, ML) |
 | **Portfolio Management** | CRUD operations for user domain portfolios with DNS-based ownership verification |
 | **KYC Processing** | Document upload, storage, and admin review pipeline |
 | **Real-Time Messaging** | Socket.IO-based inquiry/negotiation chat system |
 | **Admin Operations** | Platform statistics, KYC review, user management |
-| **Financial Modeling** | Registrar pricing aggregation and aftermarket value calculation |
+| **Pricing Aggregation** | Multi-registrar pricing aggregation |
 
 ---
 
@@ -77,8 +77,6 @@ The Nerve Center is the **central nervous system** of NEXUS. It acts as the sing
 | `express-validator` | ^7.1.0 | Request body/param validation |
 | `cookie-parser` | ^1.4.7 | Cookie parsing middleware |
 | `uuid` | ^10.0.0 | UUID generation |
-| `csv-parser` | ^3.0.0 | CSV file parsing (legacy) |
-| `rss-parser` | ^3.13.0 | RSS feed parsing (legacy) |
 
 ### Dev Dependencies
 
@@ -94,7 +92,6 @@ The Nerve Center is the **central nervous system** of NEXUS. It acts as the sing
 nerve-center/
 ├── .env                        # Environment variables (not committed)
 ├── .env.example                # Template for environment configuration
-├── Dockerfile                  # Container build instructions
 ├── package.json                # Dependencies and scripts
 ├── uploads/                    # File upload storage
 │   └── kyc/                    # KYC document images
@@ -124,10 +121,8 @@ nerve-center/
     │   ├── user.js             # User profile/portfolio/KYC endpoints
     │   └── watchlist.js        # Watchlist CRUD endpoints
     └── services/
-        ├── dnsService.js       # DNS MX record intelligence
         ├── mlService.js        # ★ Bridge to Intelligence Core
-        ├── pricingService.js   # Financial modeling engine
-        ├── rdapService.js      # RDAP ownership lookup
+        ├── pricingService.js   # Registrar pricing logic
         ├── registrarService.js # Multi-registrar price aggregation
         ├── socketService.js    # Socket.IO initialization & room mgmt
         ├── verificationService.js # DNS TXT verification
@@ -142,7 +137,7 @@ nerve-center/
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `3001` | Server listen port |
+| `PORT` | `4000` | Server listen port |
 | `NODE_ENV` | `development` | Environment mode |
 | `FRONTEND_ORIGIN` | `http://localhost:3000` | Allowed CORS origin |
 | `LOG_LEVEL` | `info` | Winston log level |
@@ -411,8 +406,8 @@ Real-time streaming endpoint that performs a **4-stage intelligence pipeline**:
 |---|---|---|
 | 1. Scanning | 10% | Structural integrity analysis, TLD validation |
 | 2. Core Processing | 40% | ML model prediction via Intelligence Core |
-| 3. Ownership Audit | 65% | Portfolio DB check → WHOIS + DNS fallback |
-| 4. Synthesizing | 85% | Registrar pricing aggregation + financial modeling |
+| 3. Ownership Audit | 65% | Portfolio DB check → WHOIS fallback |
+| 4. Synthesizing | 85% | Registrar pricing aggregation |
 
 **SSE Events**:
 - `progress` → `{ stage, pct, message }`
@@ -520,24 +515,11 @@ Acts as an HTTP bridge to the Python Intelligence Core. Sends domain names to `P
 **Authentication**: Uses `X-Internal-Key` header with shared secret.
 **Timeout**: 15 seconds.
 
-### `pricingService.js` — Financial Modeling Engine
+### `pricingService.js` — Pricing Aggregation Engine
 
 #### `calculateRegistrarPricing(domain, scores, liveData, currency)`
 
 Compares pricing across GoDaddy, Porkbun, and Name.com. Generates affiliate URLs for each registrar.
-
-#### `calculateAftermarketValue(domain, scores)`
-
-Computes estimated resale value using:
-
-| Factor | Algorithm |
-|---|---|
-| **Base Value** | TLD-specific base (`.com` = $800, `.ai` = $1200, `.io` = $600, etc.) × USD_TO_INR (83.5) |
-| **Length Multiplier** | ≤3 chars → 8×, ≤5 chars → 3×, else 1× |
-| **Quality Multiplier** | `(overall_score / 55) ^ (score > 80 ? 3 : 2.2)` |
-| **Semantic Bonus** | 1.5× if semantic score > 80 |
-
-**Tier Classification**: > ₹835,000 → Premium | > ₹417,500 → Investment | else → Standard
 
 ### `registrarService.js` — Multi-Registrar Aggregator
 
@@ -549,7 +531,7 @@ Queries three registrar APIs concurrently via `Promise.all`:
 | **Porkbun** | JSON API v3 | Availability + full TLD pricing + free WHOIS privacy |
 | **Name.com** | REST API v4 | Batch availability check + purchase/renewal pricing |
 
-Currency conversion: If `PREFERRED_CURRENCY=INR`, multiplies USD prices by 83.50.
+Currency conversion: If `PREFERRED_CURRENCY=INR`, multiplies USD prices by 95.93.
 
 ### `whoisService.js` — WHOIS Intelligence
 
@@ -559,19 +541,6 @@ Integrates with **WhoisJSON.com** API to retrieve:
 - Registrar details (name, email, abuse contacts)
 - Nameservers, DNSSEC status, domain status codes
 
-### `dnsService.js` — DNS Intelligence
-
-Performs MX record audit using Node.js `dns.promises`:
-- Detects mail infrastructure presence
-- Identifies mail provider (Google Workspace, Microsoft 365, GoDaddy, Zoho, Hostinger)
-- Returns sorted MX records by priority
-
-### `rdapService.js` — RDAP Ownership
-
-Queries `rdap.org` for structured domain ownership data:
-- Parses vCard format for registrant entity
-- Extracts name, organization, country
-- Falls back gracefully on 404 (unregistered domains)
 
 ### `verificationService.js` — DNS Ownership Verification
 
@@ -694,19 +663,22 @@ All user inputs validated via `express-validator`:
 
 ## 12. Deployment
 
-### Docker
+### Windows Local Setup (PowerShell)
 
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY . .
-CMD ["sh", "-c", "node src/db/migrate.js && node src/app.js"]
-EXPOSE 3001
+```powershell
+# 1. Install dependencies
+npm install
+
+# 2. Configure Environment variables
+Copy-Item .env.example .env
+# (Edit .env with your specific keys)
+
+# 3. Run database migrations
+npm run migrate
+
+# 4. Start the development server
+npm run dev
 ```
-
-**Startup Sequence**: Runs database migration first, then starts the Express server.
 
 ### NPM Scripts
 
@@ -723,3 +695,16 @@ GET /health → { "status": "ok", "db": "connected", "ts": "2026-..." }
 ```
 
 Returns `503` with `"db": "disconnected"` if PostgreSQL is unreachable.
+
+---
+
+## 13. Educational References
+
+Here are resources to learn the core technologies used in the Nerve Center:
+
+- **Node.js**: [Node.js Official Documentation](https://nodejs.org/en/docs/)
+- **Express.js**: [Express API Reference](https://expressjs.com/en/4x/api.html)
+- **PostgreSQL**: [PostgreSQL Official Documentation](https://www.postgresql.org/docs/)
+- **pg (node-postgres)**: [node-postgres Documentation](https://node-postgres.com/)
+- **Socket.IO**: [Socket.IO Documentation](https://socket.io/docs/v4/)
+- **JWT (JSON Web Tokens)**: [Introduction to JSON Web Tokens](https://jwt.io/introduction)

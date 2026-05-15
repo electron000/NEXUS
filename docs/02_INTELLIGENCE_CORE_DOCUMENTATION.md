@@ -44,7 +44,7 @@ The Intelligence Core is a **dedicated ML microservice** that operates as an int
                     │                      │
                     │  ┌────────────────┐  │
                     │  │ Tier Model     │  │ ← RandomForest (.pkl, ~2.8MB)
-                    │  │ (Classification)│  │
+                    │  │ (Regression)│  │
                     │  └────────────────┘  │
                     │  ┌────────────────┐  │
                     │  │ Price Model    │  │ ← RandomForest (.pkl, ~16MB)
@@ -54,11 +54,8 @@ The Intelligence Core is a **dedicated ML microservice** that operates as an int
                     │  │ Semantic Engine│  │ ← Gemini LLM API
                     │  │ (LLM Scoring)  │  │
                     │  └────────────────┘  │
-                    │  ┌────────────────┐  │
-                    │  │ Feature Eng.   │  │ ← Algorithmic extraction
-                    │  │ (Heuristics)   │  │
-                    │  └────────────────┘  │
-                    └─────────────────────┘
+                    │                      │
+                    └───────────────────-──┘
 ```
 
 ### Core Responsibilities
@@ -89,7 +86,6 @@ The Intelligence Core is a **dedicated ML microservice** that operates as an int
 | Package | Version | Purpose |
 |---|---|---|
 | `scikit-learn` | ≥1.5.0 | RandomForest models (primary prediction engine) |
-| `xgboost` | 2.0.3 | XGBoost (available for future use; legacy) |
 | `numpy` | 1.26.4 | Numerical computation |
 | `pandas` | 2.2.2 | DataFrame-based feature vector construction |
 
@@ -98,8 +94,6 @@ The Intelligence Core is a **dedicated ML microservice** that operates as an int
 | Package | Version | Purpose |
 |---|---|---|
 | `google-generativeai` | 0.7.1 | Gemini API client for semantic scoring |
-| `openai` | 1.35.3 | OpenAI API client (available, not actively used) |
-| `pytrends` | 4.9.2 | Google Trends data (feature flag controlled) |
 
 ### Async & Utilities
 
@@ -131,7 +125,7 @@ intelligence-core/
 ├── ML_MODEL_TESTING.md           # Model testing documentation
 ├── models/
 │   ├── price_model.pkl           # ★ Trained price prediction model
-│   └── tier_model.pkl            # ★ Trained tier classification model
+│   └── tier_model.pkl            # ★ Trained tier Regression model
 └── app/
     ├── __init__.py
     ├── main.py                   # ★ FastAPI application entry point
@@ -166,11 +160,9 @@ Configuration is centralized in `app/config.py` using Pydantic's `BaseSettings` 
 | `PORT` | int | `8000` | Server listen port |
 | `PRODUCTION` | bool | `false` | Production mode (disables /docs) |
 | `INTERNAL_API_KEY` | str | `""` | Shared secret for Nerve Center authentication |
-| `NERVE_CENTER_ORIGIN` | str | `http://localhost:3001` | Allowed CORS origin |
-| `OPENAI_API_KEY` | str | `""` | OpenAI API key (optional) |
+| `NERVE_CENTER_ORIGIN` | str | `http://localhost:4000` | Allowed CORS origin |
 | `GEMINI_API_KEY` | str | `""` | Google Gemini API key (recommended) |
 | `GEMINI_MODEL_NAME` | str | `gemini-2.5-flash` | Target Gemini model for semantic scoring |
-| `USE_PYTRENDS` | bool | `true` | Enable/disable Google Trends integration |
 | `MODEL_PATH` | str | `models/` | Directory containing .pkl model files |
 
 ### Protected Namespace Handling
@@ -261,7 +253,7 @@ POST /api/ml/nexus-score
 | `model_score` | float | 0–100 | Tier model output × 100 (structural/quantitative quality) |
 | `semantic_score` | float | 0–100 | LLM-derived brand/memory/clarity composite |
 | `predicted_price` | float | ≥ 0 | Estimated aftermarket value in INR |
-| `predicted_tier` | string | `low`/`medium`/`high` | Investment tier classification |
+| `predicted_tier` | string | `low`/`medium`/`high` | Investment tier Regression |
 | `model_used` | string | — | Always `"random_forest"` |
 
 ### API Documentation
@@ -287,10 +279,10 @@ Domain String: "nexushub.io"
      ┌─────┼─────────────────────────┐
      ▼                               ▼
 ┌──────────────┐            ┌──────────────────┐
-│  Tier Model   │            │  Semantic Engine   │
-│  (Random      │            │  (Gemini LLM or   │
-│   Forest)     │            │   Local Heuristic) │
-└──────┬───────┘            └────────┬───────────┘
+│  Tier Model   │           │  Semantic Engine │
+│  (Random      │           │  (Gemini LLM)    │
+│   Forest)     │ │
+└──────┬───────┘            └────────┬──────────
        │                             │
        ▼                             ▼
   tier_value (0–1)            semantic_score (0–100)
@@ -326,22 +318,16 @@ The scorer runs the **semantic scoring** (async I/O-bound LLM call) and **ML pre
 
 **File**: `app/services/features.py`
 
-### Extracted Features (12 total)
+### Extracted Features (6 total)
 
 | # | Feature | Type | Range | Algorithm |
 |---|---|---|---|---|
-| 1 | `tld` | string | — | Raw TLD string (preserved for reference) |
-| 2 | `length` | float | 1–253 | Character count of SLD |
-| 3 | `vowel_ratio` | float | 0–1 | `vowels / length` |
-| 4 | `digit_ratio` | float | 0–1 | `digits / length` |
-| 5 | `hyphen_count` | float | 0–∞ | Count of hyphens in SLD |
-| 6 | `uniqueness` | float | 0–1 | `unique_chars / length` |
-| 7 | `alt_score` | float | 0–1 | Vowel-consonant alternation ratio |
-| 8 | `tld_score` | float | 0–1 | TLD premium score from lookup table |
-| 9 | `keyword_score` | float | 0–1 | Heuristic keyword value estimation |
-| 10 | `max_repeat` | float | 1–∞ | Maximum consecutive repeated character count |
-| 11 | `length_score` | float | 0.30–1.0 | Length-based quality curve |
-| 12 | `consonant_ratio` | float | 0–1 | `consonants / length` |
+| 1 | `length` | float | 1–253 | Character count of SLD |
+| 2 | `vowel_ratio` | float | 0–1 | `vowels / length` |
+| 3 | `has_number` | float | 0 or 1 | 1 if SLD contains a digit, else 0 |
+| 4 | `tld_score` | float | 0–1 | TLD premium score from lookup table |
+| 5 | `keyword_score` | float | 0–1 | Heuristic penalizing hyphens, digits, and lack of vowels |
+| 6 | `brand_score` | float | 0–1 | Vowel-consonant alternation ratio |
 
 ### TLD Premium Table
 
@@ -397,7 +383,7 @@ Models are loaded from `.pkl` files at startup into global variables:
 
 ```python
 _price_model = None  # RandomForest Regressor
-_tier_model = None   # RandomForest Classifier (outputs continuous 0–1)
+_tier_model = None   # RandomForest Regressor (outputs continuous 0–1)
 ```
 
 **Loading Mechanism**: Standard `pickle.load()` from the `models/` directory.
@@ -428,7 +414,7 @@ input → tier_model.predict(input_df.values) → raw_prediction
 | String `"low"/"medium"/"high"` | Mapped to 0.0 / 0.5 / 1.0 |
 | Float (0–1 continuous) | Used directly |
 
-**Tier Classification Thresholds**:
+**Tier Regression Thresholds**:
 | Tier Value | Tier Label |
 |---|---|
 | ≥ 0.68 | `high` |
@@ -483,20 +469,9 @@ Respond ONLY with valid JSON in this exact format, no other text:
 {"brandability": <number>, "memorability": <number>, "semantic_clarity": <number>}
 ```
 
-### Gemini Model Fallback Chain
+### Gemini Model
 
-The system implements a **resilient model cascade**:
-
-```
-1. Primary: settings.gemini_model_name (default: "gemini-2.5-flash")
-2. Fallback 1: "gemini-2.5-flash"
-3. Fallback 2: "gemini-2.5-pro"
-4. Fallback 3: "gemini-3-flash-preview"
-```
-
-**Error Handling**:
-- 404 (Model Not Found) → Try next model in chain
-- Auth/Quota/Network errors → Fail immediately, use heuristic fallback
+settings.gemini_model_name (default: "gemini-2.5-flash")
 
 ### Score Composition
 
@@ -511,21 +486,6 @@ composite = brandability × 0.45 + memorability × 0.35 + semantic_clarity × 0.
 ### JSON Parsing
 
 Handles markdown-fenced JSON (`\`\`\`json ... \`\`\``) and raw JSON responses. Strips fence markers before parsing.
-
-### Heuristic Fallback
-
-When no LLM API is available, a pure algorithmic fallback computes:
-
-```python
-score = (
-    length_score   × 40 +
-    alt_score      × 30 +
-    uniqueness     × 20 +
-    tld_score      × 10
-)
-```
-
-This provides a rough brandability proxy without any external API dependency.
 
 ---
 
@@ -551,14 +511,13 @@ score_domain(domain)│                                              │→ merg
 1. **Semantic scoring** runs as an async task (I/O-bound LLM API call)
 2. **ML prediction** offloaded to thread pool executor (CPU-bound pickle model inference)
 3. Results merged after both complete
-4. Semantic failure fallback: defaults to 50.0
 
 **Return Schema**:
 ```python
 {
     "modelScore":     float,   # 0–100 (from tier model)
-    "semanticScore":  float,   # 0–100 (from LLM or heuristic)
-    "predictedPrice": float,   # INR aftermarket estimate
+    "semanticScore":  float,   # 0–100 (from LLM)
+    "predictedPrice": float,   # INR aftermarket estimate (ML-predicted price)
     "predictedTier":  str,     # "low" | "medium" | "high"
 }
 ```
@@ -590,7 +549,6 @@ class NexusScoreResponse(BaseModel):
     semantic_score: float      # 0–100, LLM semantic quality
     predicted_price: float     # ≥ 0, aftermarket price estimate
     predicted_tier: str        # "low" | "medium" | "high"
-    model_used: str            # "random_forest" | "heuristic" | "llm-only"
 ```
 
 ---
@@ -631,38 +589,20 @@ allow_origins=[settings.nerve_center_origin]
 
 ---
 
-## 14. Deployment
+### Windows Local Setup (PowerShell)
 
-### Docker
+```powershell
+# 1. Create a virtual environment
+python -m venv venv
 
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
+# 2. Activate the virtual environment
+.\venv\Scripts\Activate.ps1
 
-# System deps for XGBoost / numpy
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ curl \
-    && rm -rf /var/lib/apt/lists/*
+# 3. Install dependencies
+pip install -r requirements.txt
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-RUN mkdir -p /app/models
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
-EXPOSE 8000
-```
-
-**Key Notes**:
-- Multi-worker Uvicorn (2 workers) for concurrency
-- System C/C++ compilers installed for native extension compilation
-- Model files (`models/*.pkl`) must be volume-mounted or baked into the image
-
-### Local Development
-
-```bash
-python -m uvicorn app.main:app --reload --port 8000
+# 4. Start the FastAPI server
+uvicorn app.main:app --reload --port 8000
 ```
 
 ### Health Check
@@ -680,3 +620,14 @@ GET /health → { "status": "ok", "service": "intelligence-core" }
 | Full scoring (uncached, with LLM) | 1–3 seconds |
 | Memory footprint | ~200–400 MB (with models loaded) |
 | Model file total size | ~19 MB |
+
+---
+
+## 15. Educational References
+
+Here are resources to learn the core technologies used in the Intelligence Core:
+
+- **FastAPI**: [FastAPI Official Documentation](https://fastapi.tiangolo.com/)
+- **Scikit-learn**: [scikit-learn User Guide](https://scikit-learn.org/stable/user_guide.html) (especially [RandomForest](https://scikit-learn.org/stable/modules/ensemble.html#forests-of-randomized-trees))
+- **Google Generative AI**: [Gemini API Documentation](https://ai.google.dev/docs)
+- **Pydantic**: [Pydantic Documentation](https://docs.pydantic.dev/latest/)

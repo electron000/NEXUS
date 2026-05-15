@@ -44,10 +44,10 @@ def predict_valuation(domain: str) -> dict:
     input_df = pd.DataFrame([{
         "length": feats["length"],
         "vowel_ratio": feats["vowel_ratio"],
-        "has_number": float(feats["digit_ratio"] > 0),
+        "has_number": feats["has_number"],
         "tld_score": feats["tld_score"],
         "keyword_score": feats["keyword_score"], 
-        "brand_score": feats["alt_score"], 
+        "brand_score": feats["brand_score"], 
     }])
 
     results = {

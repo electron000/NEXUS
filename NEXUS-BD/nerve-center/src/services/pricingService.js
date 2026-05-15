@@ -6,7 +6,7 @@
  * prices and estimates the resale value.
  */
 
-const USD_TO_INR = 83.5;
+const USD_TO_INR = 95.93;
 
 /**
  * CALCULATE REGISTRAR PRICING
