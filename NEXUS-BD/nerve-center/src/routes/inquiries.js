@@ -82,7 +82,11 @@ router.get('/', async (req, res) => {
     const result = await query(
       `SELECT i.*, 
               s.email as sender_email, 
-              r.email as receiver_email 
+              r.email as receiver_email,
+              (SELECT COUNT(*) FROM messages m 
+               WHERE m.inquiry_id = i.id 
+               AND m.sender_id != $1 
+               AND m.is_read = FALSE) as unread_count
        FROM inquiries i
        JOIN users s ON i.sender_id = s.id
        JOIN users r ON i.receiver_id = r.id
@@ -92,7 +96,30 @@ router.get('/', async (req, res) => {
     );
     return res.json(result.rows);
   } catch (err) {
+    logger.error('Failed to fetch inquiries', { error: err.message });
     return res.status(500).json({ error: 'Failed to fetch inquiries.' });
+  }
+});
+
+/**
+ * GET /api/inquiries/unread-count
+ * Get total number of unread messages for the user.
+ */
+router.get('/unread-count', async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT COUNT(*) as total 
+       FROM messages m
+       JOIN inquiries i ON m.inquiry_id = i.id
+       WHERE (i.sender_id = $1 OR i.receiver_id = $1)
+       AND m.sender_id != $1
+       AND m.is_read = FALSE`,
+      [req.user.id]
+    );
+    return res.json({ count: parseInt(result.rows[0].total, 10) });
+  } catch (err) {
+    logger.error('Failed to fetch unread count', { error: err.message });
+    return res.status(500).json({ error: 'Failed to fetch unread count.' });
   }
 });
 
@@ -102,29 +129,54 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id/messages', async (req, res) => {
   try {
+    const inquiryId = req.params.id;
     // Verify user is part of this inquiry
     const authCheck = await query(
       'SELECT id FROM inquiries WHERE id = $1 AND (sender_id = $2 OR receiver_id = $2)',
-      [req.params.id, req.user.id]
+      [inquiryId, req.user.id]
     );
 
     if (authCheck.rows.length === 0) {
       return res.status(403).json({ error: 'Unauthorized to view this chat.' });
     }
 
+    // 1. Mark incoming messages as read
+    await query(
+      'UPDATE messages SET is_read = TRUE WHERE inquiry_id = $1 AND sender_id != $2 AND is_read = FALSE',
+      [inquiryId, req.user.id]
+    );
+
+    // 2. Fetch history
     const result = await query(
       `SELECT m.*, u.email as sender_email 
        FROM messages m
        JOIN users u ON m.sender_id = u.id
        WHERE m.inquiry_id = $1
        ORDER BY m.created_at ASC`,
-      [req.params.id]
+      [inquiryId]
     );
 
     return res.json(result.rows);
   } catch (err) {
     logger.error('Failed to fetch messages', { error: err.message });
     return res.status(500).json({ error: 'Failed to fetch messages.' });
+  }
+});
+
+/**
+ * PATCH /api/inquiries/:id/read
+ * Mark all received messages in an inquiry as read.
+ */
+router.patch('/:id/read', async (req, res) => {
+  try {
+    await query(
+      'UPDATE messages SET is_read = TRUE WHERE inquiry_id = $1 AND sender_id != $2 AND is_read = FALSE',
+      [req.params.id, req.user.id]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    logger.error('Failed to mark messages as read', { error: err.message });
+    return res.status(500).json({ error: 'Failed to mark messages as read.' });
   }
 });
 

@@ -151,6 +151,7 @@ router.get('/me', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return res.json({ user: sanitizeUser(result.rows[0]) });
   } catch (err) {
     logger.error('/me error', { message: err.message });
